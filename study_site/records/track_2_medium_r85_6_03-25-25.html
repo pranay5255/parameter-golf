@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #6 — 2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 2: GPT-2 Medium → Record #6
+        </div>
+        <div class="detail-title">#6: 2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern</div>
+        <div class="detail-time">25.95 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span>
+            <span style="color:var(--muted);margin-left:1rem">03/25/25</span>
+            <span style="color:var(--muted)">by @YouJiacheng</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>This record contributes to the speedrun through changes in: architecture, systems, training.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture + systems + training</p>
+                </div>
+            </div>
+        </div>
+    
+        <div class="section">
+            <div class="section-header">Record Details</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>Note</h4>
+                    <p>This record predates the PR-based workflow. Code changes were committed directly
+                    to the repository. The description and external links below provide context for what changed.</p>
+                    <p>External writeup: <a href="https://x.com/YouJiacheng/status/1905861218138804534" target="_blank">https://x.com/YouJiacheng/status/1905861218138804534</a></p>
+                </div>
+            </div>
+        </div>
+    
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>train_gpt-20250329.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>2.9194</td>
+                <td>1556.9s</td>
+                <td>6710</td>
+                <td>232.03ms</td>
+                <td>57971 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: train_gpt-20250329.txt</span>
+                    <span>577 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 577 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read() # read the code of this file ASAP, for logging</span><span class="line">import uuid</span><span class="line">import time</span><span class="line">import copy</span><span class="line">from dataclasses import dataclass</span><span class="line">from functools import lru_cache</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_CUDA_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line">torch.empty(1, device=&quot;cuda&quot;, requires_grad=True).backward() # prevents a bug on some systems</span><span class="line">from torch import Tensor, nn</span><span class="line">import torch.nn.functional as F</span><span class="line">import torch.distributed as dist</span><span class="line"># use of FlexAttention contributed by @KoszarskyB</span><span class="line">from torch.nn.attention.flex_attention import BlockMask, flex_attention</span><span class="line">torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span><span class="line">def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8.T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[1]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w.T, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_backward&quot;, mutates_args=())</span><span class="line">def mm_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        x_inv_s = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_inv_s = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_inv_s = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_inv_s,</span><span class="line">            scale_b=w_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        # faster than grad_f8_t @ x_f8, for (d_out, d_in) == (50304, 768)</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_inv_s,</span><span class="line">            scale_b=grad_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        ).T</span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    return impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">@mm_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.T.contiguous().T.to(torch.float32)</span><span class="line"></span><span class="line">def backward(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_op.register_autograd(backward, setup_context=setup_context)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line">@torch.compile</span><span class="line">def zeropower_via_newtonschulz5(G: Tensor, steps: int) -&gt; Tensor:</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a</span><span class="line">    quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose</span><span class="line">    of minimizing steps, it turns out to be empirically effective to keep increasing the slope at</span><span class="line">    zero even beyond the point where the iteration no longer converges all the way to one everywhere</span><span class="line">    on the interval. This iteration therefore does not produce UV^T but rather something like US&#x27;V^T</span><span class="line">    where S&#x27; is diagonal with S_{ii}&#x27; ~ Uniform(0.5, 1.5), which turns out not to hurt model</span><span class="line">    performance at all relative to UV^T, where USV^T = G is the SVD.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert G.ndim &gt;= 2 # batched Muon implementation by @scottjmaddox, and put into practice in the record by @YouJiacheng</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)</span><span class="line">    # Perform the NS iterations</span><span class="line">    for a, b, c in [</span><span class="line">        (4.0848, -6.8946, 2.9270),</span><span class="line">        (3.9505, -6.3029, 2.6377),</span><span class="line">        (3.7418, -5.5913, 2.3037),</span><span class="line">        (2.8769, -3.1427, 1.2046),</span><span class="line">        (2.8366, -3.0525, 1.2012),</span><span class="line">    ]:</span><span class="line">        A = X @ X.mT</span><span class="line">        B = b * A + c * A @ A # quintic computation strategy adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng</span><span class="line">        X = a * X + B @ X</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Some warnings:</span><span class="line">    - This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    - To use it with 4D convolutional filters, it works well to just flatten their last 3 dimensions.</span><span class="line"></span><span class="line">    Arguments:</span><span class="line">        lr: The learning rate used by the internal SGD.</span><span class="line">        momentum: The momentum used by the internal SGD.</span><span class="line">        nesterov: Whether to use Nesterov-style momentum in the internal SGD. (recommended)</span><span class="line">        ns_steps: The number of Newton-Schulz iteration steps to use.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95, nesterov=True, ns_steps=5, rank=0, world_size=1):</span><span class="line">        self.rank = rank</span><span class="line">        self.world_size = world_size</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum, nesterov=nesterov, ns_steps=ns_steps)</span><span class="line">        params: list[Tensor] = [*params]</span><span class="line">        param_groups = []</span><span class="line">        for size in {p.numel() for p in params}:</span><span class="line">            b = torch.empty(world_size, size, dtype=torch.bfloat16, device=&quot;cuda&quot;)</span><span class="line">            group = dict(params=[p for p in params if p.numel() == size],</span><span class="line">                         update_buffer=b, update_buffer_views=[b[i] for i in range(world_size)])</span><span class="line">            param_groups.append(group)</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def step(self):</span><span class="line">        for group in self.param_groups:</span><span class="line">            update_buffer: Tensor = group[&quot;update_buffer&quot;]</span><span class="line">            update_buffer_views: list[Tensor] = group[&quot;update_buffer_views&quot;]</span><span class="line">            # generate weight updates in distributed fashion</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            handle = None</span><span class="line">            params_world = None</span><span class="line">            def update_prev(): # optimized Muon implementation contributed by @YouJiacheng</span><span class="line">                handle.wait()</span><span class="line">                for p_world, g_world in zip(params_world, update_buffer_views):</span><span class="line">                    p_world.mul_(1 - group[&quot;lr&quot;] * group[&quot;weight_decay&quot;] * getattr(p_world, &quot;wd_mul&quot;, 1.0))</span><span class="line">                    p_world.add_(g_world.view_as(p_world),</span><span class="line">                                 alpha=-group[&quot;lr&quot;] * max(1, p_world.size(-2) / p_world.size(-1))**0.5)</span><span class="line">            for base_i in range(len(params))[::self.world_size]:</span><span class="line">                if base_i + self.rank &lt; len(params):</span><span class="line">                    p = params[base_i + self.rank]</span><span class="line">                    g = p.grad</span><span class="line">                    assert g is not None</span><span class="line">                    state = self.state[p]</span><span class="line">                    if &quot;momentum_buffer&quot; not in state:</span><span class="line">                        state[&quot;momentum_buffer&quot;] = torch.zeros_like(g)</span><span class="line">                    buf: Tensor = state[&quot;momentum_buffer&quot;]</span><span class="line">                    buf.lerp_(g, 1 - group[&quot;momentum&quot;])</span><span class="line">                    g = g.lerp_(buf, group[&quot;momentum&quot;]) if group[&quot;nesterov&quot;] else buf</span><span class="line">                    g = zeropower_via_newtonschulz5(g, steps=group[&quot;ns_steps&quot;]).flatten()</span><span class="line">                else:</span><span class="line">                    g = update_buffer_views[self.rank]</span><span class="line">                if base_i &gt; 0:</span><span class="line">                    update_prev() # async all_gather instead of sync all_reduce by @YouJiacheng</span><span class="line">                handle = dist.all_gather_into_tensor(update_buffer, g, async_op=True)</span><span class="line">                params_world = params[base_i : base_i + self.world_size]</span><span class="line">            update_prev()</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># PyTorch nn.Module definitions for the model</span><span class="line"></span><span class="line">def norm(x: Tensor):</span><span class="line">    return F.rms_norm(x, (x.size(-1),))</span><span class="line"></span><span class="line">class CastedLinear(nn.Linear):</span><span class="line">    def __init__(self, in_features: int, out_features: int, use_fp8: bool = False, x_s: float = 1.0, w_s: float = 1.0, grad_s: float = 1.0):</span><span class="line">        super().__init__(in_features, out_features, bias=False)</span><span class="line">        self.use_fp8 = use_fp8</span><span class="line">        self.x_s = x_s</span><span class="line">        self.w_s = w_s</span><span class="line">        self.grad_s = grad_s</span><span class="line"></span><span class="line">    def reset_parameters(self) -&gt; None:</span><span class="line">        std = 0.5 * (self.in_features ** -0.5) # 0.5 is a bit better than the default 1/sqrt(3)</span><span class="line">        bound = (3 ** 0.5) * std</span><span class="line">        with torch.no_grad():</span><span class="line">            self.weight.uniform_(-bound, bound)</span><span class="line"></span><span class="line">    def forward(self, x: Tensor):</span><span class="line">        if self.use_fp8 and self.training:</span><span class="line">            _x = x.flatten(0, -2)</span><span class="line">            out: Tensor = torch.ops.nanogpt.mm(_x, self.weight, x_s=self.x_s, w_s=self.w_s, grad_s=self.grad_s)[0]</span><span class="line">            return out.reshape(*x.shape[:-1], -1)</span><span class="line">        else:</span><span class="line">            return F.linear(x, self.weight.type_as(x))</span><span class="line"></span><span class="line">class Rotary(nn.Module):</span><span class="line">    def __init__(self, dim: int, max_seq_len: int):</span><span class="line">        super().__init__()</span><span class="line">        # half-truncate RoPE by @YouJiacheng (w/ base freq tuning)</span><span class="line">        angular_freq = (1 / 1024) ** torch.linspace(0, 1, steps=dim//4, dtype=torch.float32)</span><span class="line">        angular_freq = torch.cat([angular_freq, angular_freq.new_zeros(dim//4)])</span><span class="line">        t = torch.arange(max_seq_len, dtype=torch.float32)</span><span class="line">        theta = torch.einsum(&quot;i,j -&gt; ij&quot;, t, angular_freq)</span><span class="line">        self.cos = nn.Buffer(theta.cos(), persistent=False)</span><span class="line">        self.sin = nn.Buffer(theta.sin(), persistent=False)</span><span class="line"></span><span class="line">    def forward(self, x_BTHD: Tensor):</span><span class="line">        assert self.cos.size(0) &gt;= x_BTHD.size(-3)</span><span class="line">        cos, sin = self.cos[None, :x_BTHD.size(-3), None, :], self.sin[None, :x_BTHD.size(-3), None, :]</span><span class="line">        x1, x2 = x_BTHD.to(dtype=torch.float32).chunk(2, dim=-1)</span><span class="line">        y1 = x1 * cos + x2 * sin</span><span class="line">        y2 = x1 * (-sin) + x2 * cos</span><span class="line">        return torch.cat((y1, y2), 3).type_as(x_BTHD)</span><span class="line"></span><span class="line">class CausalSelfAttention(nn.Module):</span><span class="line">    def __init__(self, dim: int, num_heads: int, max_seq_len: int, head_dim=128):</span><span class="line">        super().__init__()</span><span class="line">        self.num_heads = num_heads</span><span class="line">        self.head_dim = head_dim</span><span class="line">        hdim = num_heads * head_dim</span><span class="line">        std = 0.5 * (dim ** -0.5)</span><span class="line">        bound = (3 ** 0.5) * std # improved init scale by @YouJiacheng</span><span class="line">        # merged QKV weights: suggested by many, implemented by @fernbear.bsky.social, and further improved by @YouJiacheng</span><span class="line">        # https://x.com/hi_tysam/status/1879699187107033311</span><span class="line">        self.qkv_w = nn.Parameter(torch.empty(3, hdim, dim).uniform_(-bound, bound))</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([0.5, 0.5]))</span><span class="line">        self.rotary = Rotary(head_dim, max_seq_len)</span><span class="line">        self.c_proj = CastedLinear(hdim, dim)</span><span class="line">        self.c_proj.weight.detach().zero_() # zero init suggested by @Grad62304977</span><span class="line">        # scale the attention logits by given constant, instead of the default head_dim**-0.5, by @leloykun</span><span class="line">        # inspired by learnable scalars used by @brendanh0gan https://x.com/hi_tysam/status/1879693583898591283</span><span class="line">        self.attn_scale = 0.12</span><span class="line"></span><span class="line">    def forward(self, x: Tensor, ve: Tensor | None, block_mask: BlockMask):</span><span class="line">        B, T = x.size(0), x.size(1) # batch size, sequence length</span><span class="line">        assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span><span class="line">        q, k, v = F.linear(x, self.qkv_w.flatten(end_dim=1).type_as(x)).view(B, T, 3 * self.num_heads, self.head_dim).chunk(3, dim=-2)</span><span class="line">        q, k = norm(q), norm(k) # QK norm @Grad62304977</span><span class="line">        q, k = self.rotary(q), self.rotary(k)</span><span class="line">        v = norm(v)</span><span class="line">        if ve is not None:</span><span class="line">            v = self.lambdas[0] * v + self.lambdas[1] * ve.view_as(v) # @KoszarskyB &amp; @Grad62304977</span><span class="line">        else: # skip mid-layers token value embeddings by @YouJiacheng</span><span class="line">            v = self.lambdas[0] * v</span><span class="line">        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask, scale=self.attn_scale).transpose(1, 2)</span><span class="line">        y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side</span><span class="line">        y = self.c_proj(y)</span><span class="line">        return y</span><span class="line"></span><span class="line">class MLP(nn.Module):</span><span class="line">    def __init__(self, dim: int):</span><span class="line">        super().__init__()</span><span class="line">        hdim = 4 * dim</span><span class="line">        self.c_fc = CastedLinear(dim, hdim)</span><span class="line">        self.c_proj = CastedLinear(hdim, dim)</span><span class="line">        self.c_proj.weight.detach().zero_() # zero init suggested by @Grad62304977</span><span class="line">        self.c_fc.weight.wd_mul = 2.0</span><span class="line">        self.c_proj.weight.wd_mul = 2.0</span><span class="line"></span><span class="line">    def forward(self, x: Tensor):</span><span class="line">        x = self.c_fc(x)</span><span class="line">        x = F.relu(x).square() # https://arxiv.org/abs/2109.08668v2; ~1-2% better than GELU; suggested by @SKYLINEZ007 and @Grad62304977</span><span class="line">        x = self.c_proj(x)</span><span class="line">        return x</span><span class="line"></span><span class="line">class Block(nn.Module):</span><span class="line">    def __init__(self, dim: int, num_heads: int, max_seq_len: int, layer_idx: int):</span><span class="line">        super().__init__()</span><span class="line">        # skip attention of blocks.7 (the 8th layer) by @YouJiacheng</span><span class="line">        self.attn = CausalSelfAttention(dim, num_heads, max_seq_len) if layer_idx != 7 else None</span><span class="line">        self.mlp = MLP(dim)</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([1.0, 0.0]))</span><span class="line">        self.record = nn.Buffer(torch.tensor([0.0, 0.0, 0.0]))</span><span class="line"></span><span class="line">    def forward(self, x: Tensor, ve: Tensor | None, x0: Tensor, block_mask: BlockMask):</span><span class="line">        x = self.lambdas[0] * x + self.lambdas[1] * x0</span><span class="line">        if not self.training:</span><span class="line">            self.record[0].lerp_(torch.square(x).mean(dtype=torch.float32), 0.5)</span><span class="line">        if self.attn is not None:</span><span class="line">            z = self.attn(x, ve, block_mask)</span><span class="line">            if not self.training:</span><span class="line">                self.record[1].lerp_(torch.square(z).mean(dtype=torch.float32), 0.5)</span><span class="line">            x = x + z</span><span class="line">        z = self.mlp(norm(x))</span><span class="line">        if not self.training:</span><span class="line">            self.record[2].lerp_(torch.square(z).mean(dtype=torch.float32), 0.5)</span><span class="line">        x = x + z</span><span class="line">        return x</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># The main model</span><span class="line"></span><span class="line">def next_multiple_of_n(v: float | int, *, n: int):</span><span class="line">    return next(x for x in range(n, int(v) + 1 + n, n) if x &gt;= v)</span><span class="line"></span><span class="line">class GPT(nn.Module):</span><span class="line">    def __init__(self, vocab_size: int, num_layers: int, num_heads: int, model_dim: int, max_seq_len: int):</span><span class="line">        super().__init__()</span><span class="line">        self.embed = nn.Embedding(vocab_size, model_dim)</span><span class="line">        # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual implementation following https://arxiv.org/abs/2410.17897</span><span class="line">        # value embedding code simplification inspired by @ragulpr https://github.com/KellerJordan/modded-nanogpt/pull/78</span><span class="line">        self.value_embeds = nn.ModuleList([nn.Embedding(vocab_size, model_dim) for _ in range(3)])</span><span class="line">        self.blocks = nn.ModuleList([Block(model_dim, num_heads, max_seq_len, i) for i in range(num_layers)])</span><span class="line">        # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span><span class="line">        # suggested to me by @Grad62304977. this originates from Karpathy&#x27;s experiments.</span><span class="line">        self.lm_head = CastedLinear(model_dim, next_multiple_of_n(vocab_size, n=128), use_fp8=True, x_s=0.5, w_s=2**-9, grad_s=2**-19)</span><span class="line">        self.lm_head.weight.detach().zero_() # @Grad62304977</span><span class="line">        # Add learnable skip connection weights for decoder layers</span><span class="line">        assert num_layers % 2 == 0</span><span class="line">        self.skip_weights = nn.Parameter(torch.ones(num_layers//2))</span><span class="line"></span><span class="line">    def create_blockmasks(self, input_seq: Tensor, sliding_window_num_blocks: Tensor):</span><span class="line">        BLOCK_SIZE = 128</span><span class="line">        docs = (input_seq == 50256).cumsum(0)</span><span class="line"></span><span class="line">        def document_causal(b, h, q_idx, kv_idx):</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = docs[q_idx] == docs[kv_idx]</span><span class="line">            return causal_mask &amp; document_mask</span><span class="line"></span><span class="line">        def dense_to_ordered(dense_blockmask: Tensor):</span><span class="line">            num_blocks = dense_blockmask.sum(dim=-1, dtype=torch.int32)</span><span class="line">            indices = dense_blockmask.argsort(dim=-1, descending=False, stable=True).flip(-1).to(torch.int32)</span><span class="line">            return num_blocks[None, None].contiguous(), indices[None, None].contiguous()</span><span class="line"></span><span class="line">        # manual block mask creation by @YouJiacheng</span><span class="line">        assert len(input_seq) % BLOCK_SIZE == 0</span><span class="line">        NUM_BLOCKS = len(input_seq) // BLOCK_SIZE</span><span class="line">        block_idx = torch.arange(NUM_BLOCKS, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">        causal_blockmask_any = block_idx[:, None] &gt;= block_idx</span><span class="line">        causal_blockmask_all = block_idx[:, None] &gt; block_idx</span><span class="line">        docs_low = docs.view(-1, BLOCK_SIZE)[:, 0].contiguous()</span><span class="line">        docs_high = docs.view(-1, BLOCK_SIZE)[:, -1].contiguous()</span><span class="line">        document_blockmask_any = (docs_low[:, None] &lt;= docs_high) &amp; (docs_high[:, None] &gt;= docs_low)</span><span class="line">        document_blockmask_all = (docs_low[:, None] == docs_high) &amp; (docs_high[:, None] == docs_low)</span><span class="line">        blockmask_any = causal_blockmask_any &amp; document_blockmask_any</span><span class="line">        blockmask_all = causal_blockmask_all &amp; document_blockmask_all</span><span class="line">        partial_kv_num_blocks, partial_kv_indices = dense_to_ordered(blockmask_any &amp; ~blockmask_all)</span><span class="line">        full_kv_num_blocks, full_kv_indices = dense_to_ordered(blockmask_all)</span><span class="line">        def build_bm(window_size_blocks: Tensor) -&gt; BlockMask:</span><span class="line">            return BlockMask.from_kv_blocks(</span><span class="line">                torch.clamp_max(partial_kv_num_blocks, torch.clamp_min(window_size_blocks - full_kv_num_blocks, 1)),</span><span class="line">                partial_kv_indices,</span><span class="line">                torch.clamp_max(full_kv_num_blocks, window_size_blocks - 1),</span><span class="line">                full_kv_indices,</span><span class="line">                BLOCK_SIZE=BLOCK_SIZE,</span><span class="line">                mask_mod=document_causal,</span><span class="line">            )</span><span class="line">        # Long-short SWA block masks by @leloykun &amp; @YouJiacheng, adapated from suggestion by @Grad62304977, following Gemma 2 paper</span><span class="line">        return build_bm(sliding_window_num_blocks), build_bm(sliding_window_num_blocks // 2)</span><span class="line"></span><span class="line">    def forward(self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_blocks: Tensor):</span><span class="line">        assert input_seq.ndim == 1</span><span class="line"></span><span class="line">        ve = [value_embed(input_seq) for value_embed in self.value_embeds]</span><span class="line">        # 012 ... 012 structure on token value embeddings by @YouJiacheng, improved on @leloykun&#x27;s U-net structure</span><span class="line">        ve = [ve[0], ve[1], ve[2]] + [None] * (len(self.blocks) - 6) + [ve[0], ve[1], ve[2]]</span><span class="line">        assert len(ve) == len(self.blocks)</span><span class="line"></span><span class="line">        long_bm, short_bm = self.create_blockmasks(input_seq, sliding_window_num_blocks)</span><span class="line">        block_masks = [long_bm, short_bm, short_bm, short_bm, long_bm, short_bm, short_bm, short_bm, short_bm, short_bm, short_bm, long_bm, short_bm, short_bm, short_bm, long_bm]</span><span class="line">        assert len(block_masks) == len(self.blocks)</span><span class="line"></span><span class="line">        x = x0 = norm(self.embed(input_seq)[None]) # use of norm here by @Grad62304977</span><span class="line"></span><span class="line">        # U-net design by @brendanh0gan</span><span class="line">        skip_connections = []</span><span class="line">        n = len(self.skip_weights)</span><span class="line">        skip_map = {</span><span class="line">            9: 6,</span><span class="line">            10: 4,</span><span class="line">            11: 2,</span><span class="line">        }</span><span class="line">        for i in range(len(self.blocks)):</span><span class="line">            if i in skip_map:</span><span class="line">                x = x + self.skip_weights[skip_map[i]] * skip_connections[skip_map[i]]</span><span class="line">            x = self.blocks[i](x, ve[i], x0, block_masks[i])</span><span class="line">            if i &lt; n:</span><span class="line">                skip_connections.append(x)</span><span class="line"></span><span class="line">        x = norm(x)</span><span class="line">        logits = self.lm_head(x)</span><span class="line">        # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)</span><span class="line">        logits = 30 * torch.sigmoid(logits.float() / 7.5)</span><span class="line">        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq)</span><span class="line">        return loss</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Our own simple Distributed Data Loader</span><span class="line"></span><span class="line">def _load_data_shard(file: Path):</span><span class="line">    header = torch.from_file(str(file), False, 256, dtype=torch.int32) # header is 256 int32</span><span class="line">    assert header[0] == 20240520, &quot;magic number mismatch in the data .bin file&quot;</span><span class="line">    assert header[1] == 1, &quot;unsupported version&quot;</span><span class="line">    num_tokens = int(header[2]) # number of tokens (claimed)</span><span class="line">    with file.open(&quot;rb&quot;, buffering=0) as f:</span><span class="line">        tokens = torch.empty(num_tokens, dtype=torch.uint16, pin_memory=True) # avoid pin_memory copy by @YouJiacheng</span><span class="line">        f.seek(256 * 4)</span><span class="line">        nbytes = f.readinto(tokens.numpy()) # avoid bytes-&gt;array copy by @YouJiacheng</span><span class="line">        assert nbytes == 2 * num_tokens, &quot;number of tokens read does not match header&quot;</span><span class="line">    return tokens</span><span class="line"></span><span class="line">def distributed_data_generator(filename_pattern: str, batch_size: int, rank : int, world_size : int):</span><span class="line">    files = sorted(Path.cwd().glob(filename_pattern))</span><span class="line">    assert batch_size % world_size == 0</span><span class="line">    local_batch_size = batch_size // world_size</span><span class="line">    file_iter = iter(files) # use itertools.cycle(files) instead if you want to do multi-epoch training</span><span class="line">    tokens, pos = _load_data_shard(next(file_iter)), 0</span><span class="line">    while True:</span><span class="line">        if pos + batch_size + 1 &gt;= len(tokens):</span><span class="line">            tokens, pos = _load_data_shard(next(file_iter)), 0</span><span class="line">        buf = tokens[pos + rank * local_batch_size:][:local_batch_size + 1]</span><span class="line">        inputs = buf[:-1].to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True) # no sync on host side;</span><span class="line">        targets = buf[1:].to(device=&quot;cuda&quot;, dtype=torch.int64, non_blocking=True) # H2D in another stream isn&#x27;t helpful.</span><span class="line">        pos += batch_size</span><span class="line">        yield inputs, targets</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># int main</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class Hyperparameters:</span><span class="line">    # data</span><span class="line">    train_files = &quot;data/fineweb10B/fineweb_train_*.bin&quot; # input .bin to train on</span><span class="line">    val_files = &quot;data/fineweb10B/fineweb_val_*.bin&quot; # input .bin to eval validation loss on</span><span class="line">    val_tokens = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span><span class="line">    train_seq_len = 64*1024 # FlexAttention sequence length</span><span class="line">    val_seq_len = 4*64*1024 # FlexAttention sequence length for validation</span><span class="line">    # optimization</span><span class="line">    num_iterations = 6710 # number of iterations to run</span><span class="line">    cooldown_frac = 0.6 # fraction of training spent cooling down the learning rate</span><span class="line">    # architecture</span><span class="line">    vocab_size = 50257</span><span class="line">    # evaluation and logging</span><span class="line">    val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end</span><span class="line">    save_checkpoint = False</span><span class="line">args = Hyperparameters()</span><span class="line"></span><span class="line"># torchrun sets these env variables</span><span class="line">rank = int(os.environ[&quot;RANK&quot;])</span><span class="line">world_size = int(os.environ[&quot;WORLD_SIZE&quot;])</span><span class="line">assert world_size == 8 # this code is designed for 8xH100</span><span class="line">assert torch.cuda.is_available()</span><span class="line">device = torch.device(&quot;cuda&quot;, int(os.environ[&quot;LOCAL_RANK&quot;]))</span><span class="line">torch.cuda.set_device(device)</span><span class="line">dist.init_process_group(backend=&quot;nccl&quot;, device_id=device)</span><span class="line">dist.barrier()</span><span class="line">master_process = (rank == 0) # this process will do logging, checkpointing etc.</span><span class="line"></span><span class="line"># begin logging</span><span class="line">logfile = None</span><span class="line">if master_process:</span><span class="line">    run_id = uuid.uuid4()</span><span class="line">    os.makedirs(&quot;logs&quot;, exist_ok=True)</span><span class="line">    logfile = f&quot;logs/{run_id}.txt&quot;</span><span class="line">    print(logfile)</span><span class="line">def print0(s, console=False):</span><span class="line">    if master_process:</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_2_medium_r84_5_03-06-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_2_medium_r86_7_04-16-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

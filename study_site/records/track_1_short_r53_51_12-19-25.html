@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #51 — Retie Embed to lm_head, retune fp8 scales | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #51
+        </div>
+        <div class="detail-title">#51: Retie Embed to lm_head, retune fp8 scales</div>
+        <div class="detail-time">2.075 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span>
+            <span style="color:var(--muted);margin-left:1rem">12/19/25</span>
+            <span style="color:var(--muted)">by @varunneal</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Retie embedding to LM head + retune FP8 scales</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>Re-tying weights saves parameters and compute. FP8 scale retuning compensates for the changed weight sharing dynamics.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Weight tying/untying strategy</li><li>FP8 scale calibration</li><li>Parameter efficiency</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture + systems</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #175: [New Record] Retie Embedding and LM Head </span>
+                <span class="diff-stats">
+                    <span class="add">+110</span> / <span class="del">-48</span> in 3 files
+                    — by @varunneal
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p>This record reties the LM Head with the first embed and tunes some of the FP8 Scales. I have incorporated the results of <a href="https://github.com/KellerJordan/modded-nanogpt/pull/172" target="_blank">PR#172</a>.
+
+<h2>Timing and Validation</h2>
+
+This record has 55 fewer steps than the previous record at approximately the same step time.
+
+``<code>
+import scipy.stats
+import torch
+
+losses = [3.2777, 3.2790, 3.2776, 3.2792, 3.2760, 3.2792, 3.2767, 3.2763, 3.2770]
+times = [123.853, 123.969, 123.929, 123.933, 123.914, 123.906, 123.970, 123.914, 123.964]
+
+print(&quot;p=%.4f&quot; % scipy.stats.ttest_1samp(losses, 3.28, alternative=&quot;less&quot;).pvalue)
+<h1>p=0.0002</h1>
+
+print(&quot;losses:&quot;, torch.std_mean(torch.tensor(losses)))
+<h1>losses: (std=0.0013, mean=3.2776)</h1>
+
+print(&quot;time:&quot;, torch.std_mean(torch.tensor(times)))
+<h1>time: (std=0.0375, mean=123.9280)</h1>
+</code>`<code>
+
+Previous record (timed on same machine):
+
+</code>`<code>
+import scipy.stats
+import torch
+
+times = [127.051, 127.139, 127.049, 127.147, 127.163, 127.161]
+
+print(&quot;time:&quot;, torch.std_mean(torch.tensor(times)))
+<h1>time: (std=0.0537, mean=127.1183)</h1>
+</code>`<code>
+
+These timings show an improvement of $\approx 3.2$ seconds.
+
+Thank you to Prime Intellect for sponsoring my research with GPU credits.
+
+<h2>Tied Embed and LM Head</h2>
+
+<a href="https://x.com/kellerjordan0/status/1853188916704387239" target="_blank">Record 8</a> untied the LM Head with the Embed layer. This record came with two other changes: namely, adding an RMS Norm after embedding, and initializing the LM Head with zeros.
+
+In this record, I reverse both the first and third change from Record 8. My motivation was to reduce the Adam step time by reducing the amount of parameters that needed to be communicated. I thought that this tradeoff might be reasonable even if it came with an increase in the number of steps. In fact, I found that re-tying the Embed and LM Head could significantly decrease step count. On the other hand, there is basically no impact to the per-step time. I do not know exactly why, though I am guessing the fact that the LM Head weight is both the first and last element in backprop destroys some of the current asynchronous logic in DistAdam.
+
+<h2>Decreasing the FP8 Scales</h2>
+
+I discovered the above prior to PR#172 but it turns out both benefit from retuning the FP8 Scales. I ran the following experiment on the shared LM Head/Embed weight:
+
+<img src="https://raw.githubusercontent.com/KellerJordan/modded-nanogpt/01bde7685fa0b11503446e65ed964ed82616e555/records/track_1_short/2025-12-19_RetieLMHead/lm_head_weights.png" alt=""/>
+
+which guided my choice of relative scales for the FP8 weights. These plots also indicate that a simple linear schedule could be optimal for the FP8 scales, though I failed to make this work with simple attempts.
+
+Applying the scales in this Record to PR#172 without tying the LM Head gave me the following results:
+
+</code>`<code>
+import scipy.stats
+import torch
+
+losses = [3.2754, 3.2756, 3.2779, 3.2746, 3.2740]
+
+print(&quot;losses:&quot;, torch.std_mean(torch.tensor(losses)))
+<h1>losses: (std=0.0015, mean=3.2755)</h1>
+</code>``
+
+It seems that the FP8 weight rescale improves the mean and the high variance seemingly caused by cautious weight decay on the adam parameters.
+</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #175)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt.py</span>
+                        <span class="diff-stats"><span class="add">+44</span> <span class="del">-48</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -13,6 +13,7 @@</span>
+<span class="diff-ctx"> from collections import defaultdict</span>
+<span class="diff-ctx"> from itertools import accumulate</span>
+<span class="diff-ctx"> from pathlib import Path</span>
+<span class="diff-add">+import gc</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> os.environ[&quot;PYTORCH_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span>
+<span class="diff-ctx"> import torch</span>
+<span class="diff-hunk">@@ -36,7 +37,6 @@</span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-ctx"> # Custom operators: FP8 matmul by @YouJiacheng</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-</span>
+<span class="diff-ctx"> @torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span>
+<span class="diff-ctx"> def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span>
+<span class="diff-ctx">     @torch.compile</span>
+<span class="diff-hunk">@@ -392,28 +392,28 @@ def polar_express(G: torch.Tensor, split_baddbmm: bool = False):</span>
+<span class="diff-ctx">     A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span>
+<span class="diff-ctx">     B = torch.empty_like(A)</span>
+<span class="diff-ctx">     C = torch.empty_like(X)</span>
+<span class="diff-del">-  </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     # Select batched vs unbatched</span>
+<span class="diff-ctx">     if split_baddbmm:</span>
+<span class="diff-ctx">         BX_matmul = torch.bmm if X.ndim &gt; 2 else torch.mm</span>
+<span class="diff-ctx">     else:</span>
+<span class="diff-ctx">         aX_plus_BX = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span>
+<span class="diff-del">-    </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     # Perform the iterations</span>
+<span class="diff-ctx">     for a, b, c in polar_express_coeffs:</span>
+<span class="diff-ctx">         XXT(X, out=A)  # A = X @ X.mT</span>
+<span class="diff-ctx">         ba_plus_cAA(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span>
+<span class="diff-del">-        </span>
+<span class="diff-del">-        # Referencing X twice causes pytorch to make a defensive copy, </span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # Referencing X twice causes pytorch to make a defensive copy,</span>
+<span class="diff-ctx">         # resulting in a cudaMemcpyAsync in baddbmm.</span>
+<span class="diff-del">-        # For large matrices (i.e., the mlp weights), it&#x27;s faster to split </span>
+<span class="diff-add">+        # For large matrices (i.e., the mlp weights), it&#x27;s faster to split</span>
+<span class="diff-ctx">         # the operation into two kernels to avoid this.</span>
+<span class="diff-ctx">         if split_baddbmm:</span>
+<span class="diff-del">-            BX_matmul(B, X, out=C)  # C = B @ X  </span>
+<span class="diff-add">+            BX_matmul(B, X, out=C)  # C = B @ X</span>
+<span class="diff-ctx">             C.add_(X, alpha=a)      # C = C + a*X  (in-place, X only read)</span>
+<span class="diff-ctx">         else:</span>
+<span class="diff-ctx">             aX_plus_BX(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span>
+<span class="diff-del">-            </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         X, C = C, X  # Swap references to avoid unnecessary copies</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     if G.size(-2) &gt; G.size(-1):</span>
+<span class="diff-hunk">@@ -431,7 +431,7 @@ def cautious_wd_and_update_inplace(p, v, wd_tensor, lr_tensor):</span>
+<span class="diff-ctx">     wd_factor = wd_tensor.to(p.dtype)</span>
+<span class="diff-ctx">     lr_factor = lr_tensor.to(p.dtype)</span>
+<span class="diff-ctx">     p.copy_(p - (p * mask * wd_factor * lr_factor) - (v * lr_factor))</span>
+<span class="diff-del">-    </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> @torch.compile(dynamic=False, fullgraph=True)</span>
+<span class="diff-ctx"> def apply_normuon_variance_reduction(v_chunk, second_momentum_buffer, beta2, red_dim):</span>
+<span class="diff-hunk">@@ -599,28 +599,28 @@ def step(self):</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">             grad_shape = updated_grads.shape</span>
+<span class="diff-ctx">             if params[module_idx].label == &#x27;attn&#x27;:</span>
+<span class="diff-del">-                </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">                 for p in params[module_idx:module_idx + num_params]:</span>
+<span class="diff-ctx">                     assert p.label == &#x27;attn&#x27;</span>
+<span class="diff-del">-                </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">                 updated_grads = updated_grads.view(4 * grad_shape[0], grad_shape[1] // 4, grad_shape[2])</span>
+<span class="diff-del">-            </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">             ref_param = params[module_idx]</span>
+<span class="diff-ctx">             param_shape = ref_param.shape</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-            # The below shape-based heuristic assumes that matrices have their input along the </span>
+<span class="diff-add">+            # The below shape-based heuristic assumes that matrices have their input along the</span>
+<span class="diff-ctx">             # row dimension and their output along the columns. Gates are an exception.</span>
+<span class="diff-ctx">             is_gate = ref_param.label in [&#x27;smear_gate&#x27;, &#x27;attn_gate&#x27;]</span>
+<span class="diff-del">-            </span>
+<span class="diff-del">-            if &quot;second_momentum_buffer&quot; not in group:                </span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            if &quot;second_momentum_buffer&quot; not in group:</span>
+<span class="diff-ctx">                 if is_gate:</span>
+<span class="diff-ctx">                     group[&quot;second_momentum_buffer&quot;] = torch.zeros_like(updated_grads[..., :, :1])</span>
+<span class="diff-ctx">                 else:</span>
+<span class="diff-ctx">                     group[&quot;second_momentum_buffer&quot;] = (torch.zeros_like(updated_grads[..., :, :1])</span>
+<span class="diff-ctx">                         if param_shape[-2] &gt;= param_shape[-1] else torch.zeros_like(updated_grads[..., :1, :])</span>
+<span class="diff-ctx">                     )</span>
+<span class="diff-ctx">             second_momentum_buffer = group[&quot;second_momentum_buffer&quot;]</span>
+<span class="diff-del">-   </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">             if &quot;param_lr_cpu&quot; not in group:</span>
+<span class="diff-ctx">                 # Define multipliers for ALL params in this group (global, not per-shard)</span>
+<span class="diff-ctx">                 lr_mults = []</span>
+<span class="diff-hunk">@@ -654,15 +654,15 @@ def step(self):</span>
+<span class="diff-ctx">                 v_chunk = polar_express(updated_grads, split_baddbmm=(ref_param.label == &#x27;mlp&#x27;))</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">             # Note that the head orientation in O is transposed relative to QKV, so red_dim</span>
+<span class="diff-del">-            # is &#x27;incorrect&#x27; for O. However, correcting this showed no improvement. @chrisjmccormick </span>
+<span class="diff-add">+            # is &#x27;incorrect&#x27; for O. However, correcting this showed no improvement. @chrisjmccormick</span>
+<span class="diff-ctx">             red_dim = -1 if (is_gate or param_shape[-2] &gt;= param_shape[-1]) else -2</span>
+<span class="diff-del">-            </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">             v_chunk = apply_normuon_variance_reduction(</span>
+<span class="diff-ctx">                 v_chunk, second_momentum_buffer, group[&quot;beta2&quot;], red_dim</span>
+<span class="diff-ctx">             )</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">             v_chunk = v_chunk.view(grad_shape)</span>
+<span class="diff-del">-       </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">             # # &quot;Cautious&quot; weight decay (https://arxiv.org/abs/2510.12402)</span>
+<span class="diff-ctx">             updated_params = torch.empty_like(grad_chunk)</span>
+<span class="diff-ctx">             if num_params &gt; 0:</span>
+<span class="diff-hunk">@@ -718,8 +718,7 @@ def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9,</span>
+<span class="diff-ctx">         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)</span>
+<span class="diff-ctx">         params = list(params)</span>
+<span class="diff-ctx">         # Group by label, with explicit ordering for execution control.</span>
+<span class="diff-del">-        # lm_head is ready earliest.</span>
+<span class="diff-del">-        label_order = [&#x27;lm_head&#x27;, &#x27;scalars&#x27;, &#x27;value_embed&#x27;, &#x27;embed&#x27;]</span>
+<span class="diff-add">+        label_order = [&#x27;lm_head&#x27;, &#x27;value_embed&#x27;, &#x27;scalars&#x27;]</span>
+<span class="diff-ctx">         params_by_label = defaultdict(list)</span>
+<span class="diff-ctx">         for p in params:</span>
+<span class="diff-ctx">             params_by_label[getattr(p, &#x27;label&#x27;, None)].append(p)</span>
+<span class="diff-hunk">@@ -801,14 +800,12 @@ def step(self):</span>
+<span class="diff-ctx">                 denom = exp_avg_sq.sqrt().add_(eps)</span>
+<span class="diff-ctx">                 step_size = lr * (bias2 ** 0.5 / bias1)</span>
+<span class="diff-ctx">                 update = exp_avg.div(denom).mul_(step_size)</span>
+<span class="diff-del">-                # weight decay</span>
+<span class="diff-del">-                if wd != 0:</span>
+<span class="diff-del">-                    mask = (update * p_slice) &gt;= 0</span>
+<span class="diff-del">-                    # lr as weight decay  schedule</span>
+<span class="diff-del">-                    eff_weight_decay = lr * wd * getattr(param, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-                    update.addcmul_(p_slice, mask, value=eff_weight_decay * lr)</span>
+<span class="diff-del">-                </span>
+<span class="diff-add">+                # cautious weight decay</span>
+<span class="diff-add">+                mask = (update * p_slice) &gt;= 0</span>
+<span class="diff-add">+                # lr as weight decay schedule</span>
+<span class="diff-add">+                eff_weight_decay = lr * wd * getattr(param, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-add">+                update.addcmul_(p_slice, mask, value=eff_weight_decay * lr)</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">                 p_slice.add_(other=update, alpha=-1.0)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">                 all_gather_futures.append(dist.all_gather_into_tensor(param, p_slice, async_op=True).get_future())</span>
+<span class="diff-hunk">@@ -842,6 +839,10 @@ def forward(self, x: Tensor):</span>
+<span class="diff-ctx">         else:</span>
+<span class="diff-ctx">             return F.linear(x, self.weight.type_as(x))</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+</span>
+<span class="diff-add">+# -----------------------------------------------------------------------------</span>
+<span class="diff-add">+# PyTorch nn.Module definitions for the model</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> # yarn implementation @classiclarryd</span>
+<span class="diff-ctx"> class Yarn(nn.Module):</span>
+<span class="diff-ctx">     def __init__(self, head_dim, max_seq_len):</span>
+<span class="diff-hunk">@@ -961,14 +962,14 @@ def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx"> class MLP(nn.Module):</span>
+<span class="diff-ctx">     def __init__(self, dim: int):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-del">-        hdim = 4 * dim        </span>
+<span class="diff-add">+        hdim = 4 * dim</span>
+<span class="diff-ctx">         # Transposed layout to match attention weights</span>
+<span class="diff-ctx">         self.c_fc = nn.Parameter(torch.empty(hdim, dim))</span>
+<span class="diff-ctx">         self.c_proj = nn.Parameter(torch.empty(hdim, dim))</span>
+<span class="diff-ctx">         # label all modules for explicit optimizer grouping</span>
+<span class="diff-ctx">         self.c_fc.label = &#x27;mlp&#x27;</span>
+<span class="diff-ctx">         self.c_proj.label = &#x27;mlp&#x27;</span>
+<span class="diff-del">-        self.c_proj.lr_mul = 2. </span>
+<span class="diff-add">+        self.c_proj.lr_mul = 2.</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         std = 0.5 * (dim ** -0.5)</span>
+<span class="diff-ctx">         bound = (3 ** 0.5) * std # improved init scale by @YouJiacheng</span>
+<span class="diff-hunk">@@ -1008,10 +1009,7 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, head_dim: i</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-ctx">         self.num_layers = num_layers</span>
+<span class="diff-ctx">         vocab_size = next_multiple_of_n(vocab_size, n=128)</span>
+<span class="diff-del">-        self.embed = nn.Embedding(vocab_size, model_dim)</span>
+<span class="diff-del">-        # label all modules for explicit optimizer grouping</span>
+<span class="diff-del">-        self.embed.weight.label = &#x27;embed&#x27;</span>
+<span class="diff-del">-        </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         self.smear_gate = CastedLinear(12, 1)</span>
+<span class="diff-ctx">         self.smear_gate.weight.label = &#x27;smear_gate&#x27;</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -1027,7 +1025,9 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, head_dim: i</span>
+<span class="diff-ctx">         # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span>
+<span class="diff-ctx">         # suggested to me by @Grad62304977. this originates from Karpathy&#x27;s experiments.</span>
+<span class="diff-ctx">         use_fp8 = not os.environ.get(&quot;DISABLE_FP8&quot;, False)</span>
+<span class="diff-del">-        self.lm_head = CastedLinear(model_dim, vocab_size, use_fp8=use_fp8, x_s=(model_dim**0.5)/448, w_s=2**-9, grad_s=1/448)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        self.lm_head = CastedLinear(model_dim, vocab_size, use_fp8=use_fp8, x_s=100/448, w_s=1.5/448, grad_s=0.75/448)</span>
+<span class="diff-add">+        nn.init.normal_(self.lm_head.weight, mean=0, std=0.005)</span>
+<span class="diff-ctx">         self.lm_head.weight.label = &#x27;lm_head&#x27;</span>
+<span class="diff-ctx">         # Add learnable skip connection weights for decoder layers</span>
+<span class="diff-ctx">         pad = (-num_layers * 4 - 3) % dist.get_world_size()</span>
+<span class="diff-hunk">@@ -1044,14 +1044,11 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, head_dim: i</span>
+<span class="diff-ctx">                 ]</span>
+<span class="diff-ctx">             )</span>
+<span class="diff-ctx">         )</span>
+<span class="diff-del">-        </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         self.scalars.label = &#x27;scalars&#x27;</span>
+<span class="diff-ctx">         # set learning rates</span>
+<span class="diff-del">-        for param in self.embed.parameters():</span>
+<span class="diff-del">-            param.lr_mul = 75.</span>
+<span class="diff-ctx">         for param in self.value_embeds.parameters():</span>
+<span class="diff-ctx">             param.lr_mul = 75.</span>
+<span class="diff-del">-        self.lm_head.weight.lr_mul = 1.0</span>
+<span class="diff-ctx">         self.scalars.lr_mul = 5.0</span>
+<span class="diff-ctx">         self.scalars.wd_mul = 0.0</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -1079,15 +1076,15 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, seqlens: Tensor, ws_sho</span>
+<span class="diff-ctx">         bm_sizes = [short_bm, short_bm, short_bm, long_bm, short_bm, short_bm, None, short_bm, short_bm, short_bm, long_bm]</span>
+<span class="diff-ctx">         assert len(bm_sizes) == self.num_layers</span>
+<span class="diff-ctx">         key_shift = [b==long_bm for b in bm_sizes] # apply key shift to long windows</span>
+<span class="diff-del">-        </span>
+<span class="diff-del">-        # start forward pass</span>
+<span class="diff-del">-        x = self.embed(input_seq)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # weight-tied: use lm_head.weight for embedding lookup</span>
+<span class="diff-add">+        x = F.embedding(input_seq, self.lm_head.weight)</span>
+<span class="diff-ctx">         ve = [value_embed(input_seq) for value_embed in self.value_embeds]</span>
+<span class="diff-ctx">         # 012 ... 012 structure on token value embeddings by @YouJiacheng, improved on @leloykun&#x27;s U-net structure</span>
+<span class="diff-ctx">         # dropping first layer updates this to .12 ... 012</span>
+<span class="diff-ctx">         ve = [ve[1], ve[2]] + [None] * (self.num_layers - 5) + [ve[0], ve[1], ve[2]]</span>
+<span class="diff-ctx">         assert len(ve) == self.num_layers</span>
+<span class="diff-del">-        </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         # smear token embed forward 1 position @classiclarryd</span>
+<span class="diff-ctx">         smear_gate_out = smear_lambda * torch.sigmoid(self.smear_gate(x[1:, :self.smear_gate.weight.size(-1)]))</span>
+<span class="diff-ctx">         x = torch.cat([x[:1], x[1:] + smear_gate_out * x[:-1]])</span>
+<span class="diff-hunk">@@ -1111,7 +1108,7 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, seqlens: Tensor, ws_sho</span>
+<span class="diff-ctx">                 x = (resid_lambdas[0] + x0_lambdas[0]) * x</span>
+<span class="diff-ctx">             else:</span>
+<span class="diff-ctx">                 x = resid_lambdas[i] * x + x0_lambdas[i] * x0</span>
+<span class="diff-del">-            x = self.blocks[i](x, attn_args) </span>
+<span class="diff-add">+            x = self.blocks[i](x, attn_args)</span>
+<span class="diff-ctx">             if i in skip_in:</span>
+<span class="diff-ctx">                 skip_connections.append(x)</span>
+<span class="diff-ctx">             if i == backout_layer:</span>
+<span class="diff-hunk">@@ -1326,7 +1323,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx">     train_max_seq_len: int = 128 * 16</span>
+<span class="diff-ctx">     val_batch_size: int = 4 * 64 * 1024 * 8</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_scheduled_iterations: int = 2050  # number of steps to complete lr and ws schedule</span>
+<span class="diff-add">+    num_scheduled_iterations: int = 1995  # number of steps to complete lr and ws schedule</span>
+<span class="diff-ctx">     num_extension_iterations: int = 40  # number of steps to continue training at final lr and ws</span>
+<span class="diff-ctx">     num_iterations: int = num_scheduled_iterations + num_extension_iterations</span>
+<span class="diff-ctx">     cooldown_frac: float = 0.55  # fraction of num_scheduled_iterations spent cooling down the learning rate</span>
+<span class="diff-hunk">@@ -1396,7 +1393,7 @@ def nvidia_smi():</span>
+<span class="diff-ctx"> ).cuda()</span>
+<span class="diff-ctx"> for m in model.modules():</span>
+<span class="diff-ctx">     if isinstance(m, (nn.Embedding, nn.Linear)):</span>
+<span class="diff-del">-        m.bfloat16()</span>
+<span class="diff-add">+        m.weight.data = m.weight.data.bfloat16()</span>
+<span class="diff-ctx"> for param in model.parameters():</span>
+<span class="diff-ctx">     dist.broadcast(param.detach(), 0)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -1571,7 +1568,6 @@ def step_optimizers(step: int, optimizers, model):</span>
+<span class="diff-ctx"> step_batch_size = args.train_bs_schedule[0]</span>
+<span class="diff-ctx"> train_loader = distributed_data_generator(args.train_files, step_batch_size, args.train_max_seq_len, grad_accum_steps=grad_accum_steps)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-import gc</span>
+<span class="diff-ctx"> gc.collect()</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> training_time_ms = 0</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #175)</span>
+                    <span>2 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-19_RetieLMHead/README.md <span class="add" style="color:var(--green)">+66</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-19_RetieLMHead/lm_head_weights.png <span class="add" style="color:var(--green)">+0</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>0828d309-ecfe-4442-9ee9-68fed3a4b599.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2777</td>
+                <td>123.9s</td>
+                <td>2035</td>
+                <td>60.86ms</td>
+                <td>29958 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 0828d309-ecfe-4442-9ee9-68fed3a4b599.txt</span>
+                    <span>1501 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 1501 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line"></span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read()  # read the code of this file ASAP, for logging</span><span class="line">import copy</span><span class="line">import glob</span><span class="line">import math</span><span class="line">import threading</span><span class="line">import time</span><span class="line">import uuid</span><span class="line">from dataclasses import dataclass</span><span class="line">from collections import defaultdict</span><span class="line">from itertools import accumulate</span><span class="line">from pathlib import Path</span><span class="line">import gc</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line"></span><span class="line">torch.empty(</span><span class="line">    1, device=&quot;cuda&quot;, requires_grad=True</span><span class="line">).backward()  # prevents a bug on some systems</span><span class="line">import torch._dynamo as dynamo</span><span class="line">import torch.distributed as dist</span><span class="line">import torch.nn.functional as F</span><span class="line"></span><span class="line"># torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line">import triton</span><span class="line">import triton.language as tl</span><span class="line">from kernels import get_kernel</span><span class="line">from torch import Tensor, nn</span><span class="line"></span><span class="line">dynamo.config.recompile_limit = 64</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span><span class="line">def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8.T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[1]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w.T, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_backward&quot;, mutates_args=())</span><span class="line">def mm_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        x_inv_s = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_inv_s = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_inv_s = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_inv_s,</span><span class="line">            scale_b=w_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        # faster than grad_f8_t @ x_f8, for (d_out, d_in) == (50304, 768)</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_inv_s,</span><span class="line">            scale_b=grad_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        ).T</span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    return impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">@mm_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.T.contiguous().T.to(torch.float32)</span><span class="line"></span><span class="line">def backward(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_op.register_autograd(backward, setup_context=setup_context)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Triton kernel for symmetric matrix multiplication by @byronxu99</span><span class="line"></span><span class="line">def _get_autotune_configs():</span><span class="line">    return [</span><span class="line">        triton.Config(</span><span class="line">            {</span><span class="line">                &quot;BLOCK_SIZE_M&quot;: bm,</span><span class="line">                &quot;BLOCK_SIZE_N&quot;: bn,</span><span class="line">                &quot;BLOCK_SIZE_K&quot;: bk,</span><span class="line">                &quot;GROUP_SIZE_M&quot;: 8,</span><span class="line">                &quot;LOWER_UPPER&quot;: 1,</span><span class="line">            },</span><span class="line">            num_stages=stages,</span><span class="line">            num_warps=warps,</span><span class="line">        )</span><span class="line">        for bm in [64, 128]</span><span class="line">        for bn in [64, 128, 256]</span><span class="line">        for bk in [64, 128]</span><span class="line">        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span><span class="line">        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span><span class="line">    ]</span><span class="line"></span><span class="line">@triton.jit</span><span class="line">def _pid_to_block(</span><span class="line">    pid,</span><span class="line">    M,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">):</span><span class="line">    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span><span class="line">    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span><span class="line">    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span><span class="line"></span><span class="line">    # Map PID to a single matrix in batch</span><span class="line">    batch_idx = pid // (num_pid_m * num_pid_n)</span><span class="line">    pid = pid % (num_pid_m * num_pid_n)</span><span class="line"></span><span class="line">    # Map PID to 2D grid of blocks</span><span class="line">    pid_m = pid // num_pid_n</span><span class="line">    pid_n = pid % num_pid_n</span><span class="line">    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span><span class="line"></span><span class="line">    m_idx = pid_m * BLOCK_SIZE_M</span><span class="line">    n_idx = pid_n * BLOCK_SIZE_N</span><span class="line">    return batch_idx, m_idx, n_idx</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def XXT_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M, K,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def XXT(A: torch.Tensor, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = A @ A.T</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line">    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    XXT_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        K=K,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ba_plus_cAA_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    alpha, beta,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    # This is mostly duplicated from XXT_kernel, but also loads and adds a block of A</span><span class="line">    # Performance is slightly slower than XXT_kernel, so we use two separate kernels</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    # Load block of A to add (corresponds to the current block of C)</span><span class="line">    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span><span class="line">    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span><span class="line">    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span><span class="line"></span><span class="line">    # Apply alpha and beta</span><span class="line">    accumulator *= alpha</span><span class="line">    accumulator += a_add * beta</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ba_plus_cAA(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert M == K, &quot;Input matrix must be square&quot;</span><span class="line">    assert out.size(-2) == M</span><span class="line">    assert out.size(-1) == M</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ba_plus_cAA_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">        alpha=alpha,</span><span class="line">        beta=beta,</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line"># Computed for num_iters=5, safety_factor=2e-2, cushion=2</span><span class="line">polar_express_coeffs = [</span><span class="line">    (8.156554524902461, -22.48329292557795, 15.878769915207462),</span><span class="line">    (4.042929935166739, -2.808917465908714, 0.5000178451051316),</span><span class="line">    (3.8916678022926607, -2.772484153217685, 0.5060648178503393),</span><span class="line">    (3.285753657755655, -2.3681294933425376, 0.46449024233003106),</span><span class="line">    (2.3465413258596377, -1.7097828382687081, 0.42323551169305323)</span><span class="line">]</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span><span class="line">def polar_express(G: torch.Tensor, split_baddbmm: bool = False):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Polar Express Sign Method: https://arxiv.org/pdf/2505.16932</span><span class="line">    by Noah Amsel, David Persson, Christopher Musco, Robert M. Gower.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) * (1 + 2e-2) + 1e-6)</span><span class="line"></span><span class="line">    # Allocate buffers</span><span class="line">    X = X.contiguous()</span><span class="line">    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span><span class="line">    B = torch.empty_like(A)</span><span class="line">    C = torch.empty_like(X)</span><span class="line"></span><span class="line">    # Select batched vs unbatched</span><span class="line">    if split_baddbmm:</span><span class="line">        BX_matmul = torch.bmm if X.ndim &gt; 2 else torch.mm</span><span class="line">    else:</span><span class="line">        aX_plus_BX = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span><span class="line"></span><span class="line">    # Perform the iterations</span><span class="line">    for a, b, c in polar_express_coeffs:</span><span class="line">        XXT(X, out=A)  # A = X @ X.mT</span><span class="line">        ba_plus_cAA(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span><span class="line"></span><span class="line">        # Referencing X twice causes pytorch to make a defensive copy,</span><span class="line">        # resulting in a cudaMemcpyAsync in baddbmm.</span><span class="line">        # For large matrices (i.e., the mlp weights), it&#x27;s faster to split</span><span class="line">        # the operation into two kernels to avoid this.</span><span class="line">        if split_baddbmm:</span><span class="line">            BX_matmul(B, X, out=C)  # C = B @ X</span><span class="line">            C.add_(X, alpha=a)      # C = C + a*X  (in-place, X only read)</span><span class="line">        else:</span><span class="line">            aX_plus_BX(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span><span class="line"></span><span class="line">        X, C = C, X  # Swap references to avoid unnecessary copies</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Compiled helpers for NorMuon by @chrisjmccormick</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True)</span><span class="line">def cautious_wd_and_update_inplace(p, v, wd_tensor, lr_tensor):</span><span class="line">    &quot;&quot;&quot;Cautious weight decay + parameter update. wd_tensor and lr_tensor are 0-D CPU tensors.&quot;&quot;&quot;</span><span class="line">    mask = (v * p) &gt;= 0</span><span class="line">    wd_factor = wd_tensor.to(p.dtype)</span><span class="line">    lr_factor = lr_tensor.to(p.dtype)</span><span class="line">    p.copy_(p - (p * mask * wd_factor * lr_factor) - (v * lr_factor))</span><span class="line"></span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True)</span><span class="line">def apply_normuon_variance_reduction(v_chunk, second_momentum_buffer, beta2, red_dim):</span><span class="line">    &quot;&quot;&quot;NorMuon variance reduction. Algebraically fuses the normalization steps to minimize memory ops.&quot;&quot;&quot;</span><span class="line">    v_mean = v_chunk.float().square().mean(dim=red_dim, keepdim=True)</span><span class="line">    red_dim_size = v_chunk.size(red_dim)</span><span class="line">    v_norm_sq = v_mean.sum(dim=(-2, -1), keepdim=True).mul_(red_dim_size)</span><span class="line">    v_norm = v_norm_sq.sqrt_()</span><span class="line">    second_momentum_buffer.lerp_(v_mean.to(dtype=second_momentum_buffer.dtype), 1 - beta2)</span><span class="line">    step_size = second_momentum_buffer.clamp_min(1e-10).rsqrt_()</span><span class="line">    scaled_sq_sum = (v_mean * red_dim_size) * step_size.float().square()</span><span class="line">    v_norm_new = scaled_sq_sum.sum(dim=(-2, -1), keepdim=True).sqrt_()</span><span class="line">    final_scale = step_size * (v_norm / v_norm_new.clamp_min_(1e-10))</span><span class="line">    return v_chunk.mul_(final_scale.type_as(v_chunk))</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># NorMuon optimizer</span><span class="line"></span><span class="line">class NorMuon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Warning: This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line"></span><span class="line">    Differences from standard Muon:</span><span class="line">    - Newton-Shulz is replaced with Polar Express for the orthogonalization step</span><span class="line">    - NorMuon adds a low-rank variance estimator similar to Adafactor. https://arxiv.org/pdf/2510.05491</span><span class="line">    - small 1D parameters handled here instead of in Adam</span><span class="line">    - Cautious weight decay, a gated version of decoupled weight decay</span><span class="line">    - Custom distributed sizing:</span><span class="line">    The model stores all attn and mlp weights in the same shape, and then updates the view as</span><span class="line">    needed on the forward pass. This enables attn and mlp weights to be contained within the same</span><span class="line">    dist.reduce_scatter_tensor() call. The model architecture has been customized to enable</span><span class="line">    (n_attn_layers+n_mlp_layers*2)%8==0 for batching across 8 GPUs with zero padding on mlp and attn.</span><span class="line">    The scheduling is:</span><span class="line">        1. reduce scatter smear_gate (1 param 7 padding params)</span><span class="line">        2. reduce scatter attn_gate (10 params 6 padding params)</span><span class="line">        3. reduce scatter attn/mlp round 1 (10 attn params 6 mlp params)</span><span class="line">        4. reduce scatter attn/mlp round 2 (16 mlp params)</span><span class="line">        5. wait on step 1, then compute update of 1 and schedule all gather</span><span class="line">        6. wait on step 2, then compute update of 2 and schedule all gather</span><span class="line">        7. wait on step 3, then compute update of 3 and schedule all gather</span><span class="line">            GPUs receive [2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 MLP, 2 MLP, 2 MLP]</span><span class="line">            GPUs that receive params of type attn reshape before computing update</span><span class="line">        8. wait on 4, then compute update of 4 and schedule all gather</span><span class="line">        9. wait for each all gather to complete and update params</span><span class="line">    Empirically, leading with small params provides an additional 0.2s improvement.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95, beta2=0.95, custom_sizing=True):</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum, beta2=beta2)</span><span class="line">        self.world_size = dist.get_world_size() if dist.is_initialized() else 1</span><span class="line">        # custom sizing requires 8 GPUs</span><span class="line">        if custom_sizing and dist.get_world_size()==8:</span><span class="line">            param_groups = self.generate_custom_param_groups(params)</span><span class="line">        else:</span><span class="line">            param_groups = self.generate_standard_param_groups(params)</span><span class="line">        super().__init__(param_groups, defaults)</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r52_50_12-18-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r54_52_12-21-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

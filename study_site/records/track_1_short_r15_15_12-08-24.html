@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #15 — U-net pattern value embeddings, assorted code optimizations | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #15
+        </div>
+        <div class="detail-title">#15: U-net pattern value embeddings, assorted code optimizations</div>
+        <div class="detail-time">3.95 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span>
+            <span style="color:var(--muted);margin-left:1rem">12/08/24</span>
+            <span style="color:var(--muted)">by @leloykun, @YouJiacheng</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>U-net pattern value embeddings + code optimizations</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>Applying the U-net skip pattern to value embeddings. Systems optimizations reduce overhead.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>U-net value embeddings</li><li>Code optimization</li><li>MFU improvements</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture + systems</p>
+                </div>
+            </div>
+        </div>
+    
+        <div class="section">
+            <div class="section-header">Record Details</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>Note</h4>
+                    <p>This record predates the PR-based workflow. Code changes were committed directly
+                    to the repository. The description and external links below provide context for what changed.</p>
+                    <p>External writeup: <a href="https://x.com/YouJiacheng/status/1865761473886347747" target="_blank">https://x.com/YouJiacheng/status/1865761473886347747</a></p>
+                </div>
+            </div>
+        </div>
+    
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (75 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>0069607b-aa90-49fd-9766-4368bcd168c4.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2773</td>
+                <td>236.8s</td>
+                <td>1480</td>
+                <td>161.12ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>08d38857-18d8-406f-907b-c80142fec515.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2766</td>
+                <td>236.9s</td>
+                <td>1480</td>
+                <td>161.15ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>0ad22fc7-dd0c-4d79-a216-c7667db09e15.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2774</td>
+                <td>236.8s</td>
+                <td>1480</td>
+                <td>161.10ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>13daf1c4-986b-4938-b269-1ac935891505.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2768</td>
+                <td>236.9s</td>
+                <td>1480</td>
+                <td>161.15ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>14dfd7b3-d65a-4813-8327-03a9f1bf9f6e.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2778</td>
+                <td>236.9s</td>
+                <td>1480</td>
+                <td>161.14ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>16cacfc3-de94-429e-be3a-03c3c5293d08.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2771</td>
+                <td>236.8s</td>
+                <td>1480</td>
+                <td>161.12ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>19c57414-499c-4892-b25c-a7083583fa59.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2779</td>
+                <td>237.1s</td>
+                <td>1480</td>
+                <td>161.27ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>1a1fde38-fd1f-4cc9-a648-74b8d6dab734.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2773</td>
+                <td>236.9s</td>
+                <td>1480</td>
+                <td>161.15ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>1b363e84-a47e-48c9-ae21-7fb825512c9a.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2791</td>
+                <td>236.9s</td>
+                <td>1480</td>
+                <td>161.14ms</td>
+                <td>—</td>
+            </tr><tr>
+                <td>23ed0b57-544b-4fc5-b780-062dcf3f6f2c.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2810</td>
+                <td>236.8s</td>
+                <td>1480</td>
+                <td>161.12ms</td>
+                <td>—</td>
+            </tr>
+                    </table>
+                    <p class="muted" style="padding:1rem">Showing 10 of 75 log files</p>
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 0069607b-aa90-49fd-9766-4368bcd168c4.txt</span>
+                    <span>640 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 640 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read() # read the code of this file ASAP, for logging</span><span class="line">import uuid</span><span class="line">import time</span><span class="line">from dataclasses import dataclass</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">import torch</span><span class="line">from torch import nn</span><span class="line">import torch.nn.functional as F</span><span class="line">import torch.distributed as dist</span><span class="line">import torch._inductor.config as config</span><span class="line">from torch.nn.parallel import DistributedDataParallel as DDP</span><span class="line"># Use of FlexAttention contributed by @KoszarskyB</span><span class="line">from torch.nn.attention.flex_attention import BlockMask, flex_attention</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line">def zeropower_via_svd(G, steps=None):</span><span class="line">    U, S, V = G.svd()</span><span class="line">    return U @ V.T</span><span class="line"></span><span class="line">@torch.compile</span><span class="line">def zeropower_via_newtonschulz5(G, steps=10, eps=1e-7):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a</span><span class="line">    quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose</span><span class="line">    of minimizing steps, it turns out to be empirically effective to keep increasing the slope at</span><span class="line">    zero even beyond the point where the iteration no longer converges all the way to one everywhere</span><span class="line">    on the interval. This iteration therefore does not produce UV^T but rather something like US&#x27;V^T</span><span class="line">    where S&#x27; is diagonal with S_{ii}&#x27; ~ Uniform(0.5, 1.5), which turns out not to hurt model</span><span class="line">    performance at all relative to UV^T, where USV^T = G is the SVD.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert len(G.shape) == 2</span><span class="line">    a, b, c = (3.4445, -4.7750,  2.0315)</span><span class="line">    X = G.bfloat16()</span><span class="line">    X /= (X.norm() + eps) # ensure top singular value &lt;= 1</span><span class="line">    if G.size(0) &gt; G.size(1):</span><span class="line">        X = X.T</span><span class="line">    for _ in range(steps):</span><span class="line">        A = X @ X.T</span><span class="line">        B = b * A + c * A @ A # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng</span><span class="line">        X = a * X + B @ X</span><span class="line">    if G.size(0) &gt; G.size(1):</span><span class="line">        X = X.T</span><span class="line">    return X</span><span class="line"></span><span class="line">zeropower_backends = dict(svd=zeropower_via_svd, newtonschulz5=zeropower_via_newtonschulz5)</span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Some warnings:</span><span class="line">    - This optimizer assumes that all parameters passed in are 2D.</span><span class="line">    - It should not be used for the embedding layer, the final fully connected layer, or any {0,1}-D</span><span class="line">    parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    - To use it with 4D convolutional filters, it works well to just flatten their last 3 dimensions.</span><span class="line">    - We believe it is unlikely to work well for training with small batch size.</span><span class="line">    - We believe it may not work well for finetuning pretrained models, but we haven&#x27;t tested this.</span><span class="line">    - We have not yet tried this optimizer for training scenarios larger than NanoGPT (124M).</span><span class="line"></span><span class="line">    Arguments:</span><span class="line">        lr: The learning rate used by the internal SGD.</span><span class="line">        momentum: The momentum used by the internal SGD.</span><span class="line">        nesterov: Whether to use Nesterov-style momentum in the internal SGD. (recommended)</span><span class="line">        backend: The chosen backend for the orthogonalization step. (recommended: &#x27;newtonschulz5&#x27;)</span><span class="line">        backend_steps: The number of iteration steps to use in the backend, if it is iterative.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, momentum=0.95, nesterov=True,</span><span class="line">                 backend=&#x27;newtonschulz5&#x27;, backend_steps=5):</span><span class="line">        self.num_process = int(os.environ[&#x27;WORLD_SIZE&#x27;])</span><span class="line">        self.rank = int(os.environ[&quot;RANK&quot;])</span><span class="line">        defaults = dict(lr=lr, momentum=momentum, nesterov=nesterov, backend=backend, backend_steps=backend_steps)</span><span class="line">        params: &quot;list[torch.Tensor]&quot; = list(params)</span><span class="line">        assert all(isinstance(p, torch.Tensor) for p in params)</span><span class="line">        sizes = {p.numel() for p in params}</span><span class="line">        param_groups = [</span><span class="line">            {</span><span class="line">                &quot;params&quot;: [p for p in params if p.numel() == size],</span><span class="line">                &quot;update_buffer&quot;: [</span><span class="line">                    torch.empty(size, device=&quot;cuda&quot;, dtype=torch.bfloat16)</span><span class="line">                    for _ in range(self.num_process)</span><span class="line">                ],</span><span class="line">            }</span><span class="line">            for size in sizes</span><span class="line">        ]</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    def step(self):</span><span class="line">        for group in self.param_groups:</span><span class="line">            lr: float = group[&quot;lr&quot;]</span><span class="line">            momentum: float = group[&quot;momentum&quot;]</span><span class="line">            nesterov: bool = group[&quot;nesterov&quot;]</span><span class="line">            zeropower_backend = zeropower_backends[group[&quot;backend&quot;]]</span><span class="line">            backend_steps: int = group[&quot;backend_steps&quot;]</span><span class="line">            update_buffers: &quot;list[torch.Tensor]&quot; = group[&quot;update_buffer&quot;]</span><span class="line">            # generate weight updates in distributed fashion</span><span class="line">            params: &quot;list[torch.Tensor]&quot; = group[&quot;params&quot;]</span><span class="line">            assert len(params) % self.num_process == 0</span><span class="line">            handle = None</span><span class="line">            params_world = None</span><span class="line">            def update_prev():</span><span class="line">                if params_world is None:</span><span class="line">                    return</span><span class="line">                assert handle is not None</span><span class="line">                handle.wait()</span><span class="line">                for p_world, g_world in zip(params_world, update_buffers):</span><span class="line">                    p_world.data.add_(</span><span class="line">                        g_world.view_as(p_world),</span><span class="line">                        alpha=-lr * max(1, p_world.size(0) / p_world.size(1)) ** 0.5,</span><span class="line">                    )</span><span class="line">            for base_i in range(len(params))[::self.num_process]:</span><span class="line">                p = params[base_i + self.rank]</span><span class="line">                g = p.grad</span><span class="line">                assert g is not None</span><span class="line">                state = self.state[p] </span><span class="line">                if &quot;momentum_buffer&quot; not in state:</span><span class="line">                    state[&quot;momentum_buffer&quot;] = torch.zeros_like(g)</span><span class="line">                buf: torch.Tensor = state[&quot;momentum_buffer&quot;]</span><span class="line">                buf.lerp_(g, 1 - momentum)</span><span class="line">                g = g.lerp_(buf, momentum) if nesterov else buf</span><span class="line">                g = zeropower_backend(g, steps=backend_steps).flatten()</span><span class="line">                update_prev()</span><span class="line">                handle = dist.all_gather(update_buffers, g, async_op=True)</span><span class="line">                params_world = params[base_i : base_i + self.num_process]</span><span class="line">            update_prev()</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># PyTorch nn.Module definitions for the GPT-2 model</span><span class="line"></span><span class="line">def norm(x):</span><span class="line">    return F.rms_norm(x, (x.size(-1),))</span><span class="line"></span><span class="line">class CastedLinear(nn.Linear):</span><span class="line"></span><span class="line">    def __init__(self, in_features, out_features):</span><span class="line">        super().__init__(in_features, out_features, bias=False)</span><span class="line"></span><span class="line">    def forward(self, x):</span><span class="line">        return F.linear(x, self.weight.to(x.dtype))</span><span class="line"></span><span class="line">class Rotary(torch.nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim, base=10000):</span><span class="line">        super().__init__()</span><span class="line">        self.register_buffer(&#x27;inv_freq&#x27;, (1 / base) ** (torch.arange(0, dim, 2) / dim))</span><span class="line">        self.seq_len_cached = None</span><span class="line">        self.cos_cached = None</span><span class="line">        self.sin_cached = None</span><span class="line"></span><span class="line">    def forward(self, x):</span><span class="line">        seq_len = x.shape[1]</span><span class="line">        if seq_len != self.seq_len_cached:</span><span class="line">            t = torch.arange(seq_len, device=x.device)</span><span class="line">            freqs = torch.outer(t, self.inv_freq)</span><span class="line">            self.seq_len_cached = seq_len</span><span class="line">            self.cos_cached = freqs.cos()</span><span class="line">            self.sin_cached = freqs.sin()</span><span class="line">        cos, sin = self.cos_cached[None, :, None, :], self.sin_cached[None, :, None, :]</span><span class="line">        # apply_rotary_emb(x, cos, sin)</span><span class="line">        x1, x2 = x.chunk(2, dim=3)</span><span class="line">        y1 = x1 * cos + x2 * sin</span><span class="line">        y2 = x1 * (-sin) + x2 * cos</span><span class="line">        return torch.cat((y1, y2), 3).type_as(x)</span><span class="line"></span><span class="line">class CausalSelfAttention(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim, n_head):</span><span class="line">        super().__init__()</span><span class="line">        assert dim % n_head == 0</span><span class="line">        self.n_head = n_head</span><span class="line">        self.c_q = CastedLinear(dim, dim)</span><span class="line">        self.c_k = CastedLinear(dim, dim)</span><span class="line">        self.c_v = CastedLinear(dim, dim)</span><span class="line">        # value residual lambda</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([0.5, 0.5])) # @Grad62304977</span><span class="line">        # rotary embeddings</span><span class="line">        self.rotary = Rotary(dim // n_head) # dim // n_head = head_dim</span><span class="line">        # output projection</span><span class="line">        self.c_proj = CastedLinear(dim, dim)</span><span class="line">        self.c_proj.weight.data.zero_() # zero init suggested by @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor, vi: torch.Tensor, block_mask: BlockMask) -&gt; torch.Tensor:</span><span class="line">        B, T = x.size(0), x.size(1) # batch size, sequence length</span><span class="line">        assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span><span class="line">        q: torch.Tensor = self.c_q(x).view(B, T, self.n_head, -1)</span><span class="line">        k: torch.Tensor = self.c_k(x).view(B, T, self.n_head, -1)</span><span class="line">        v: torch.Tensor = self.c_v(x).view(B, T, self.n_head, -1)</span><span class="line">        v = self.lambdas[0] * v + self.lambdas[1] * vi.view_as(v) # @Grad62304977</span><span class="line">        q, k = norm(q), norm(k) # QK norm suggested by @Grad62304977</span><span class="line">        q, k = self.rotary(q), self.rotary(k)</span><span class="line">        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask)</span><span class="line">        y = y.transpose(1, 2).contiguous().view_as(x) # re-assemble all head outputs side by side</span><span class="line">        y = self.c_proj(y)</span><span class="line">        return y</span><span class="line"></span><span class="line">class MLP(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim: int):</span><span class="line">        super().__init__()</span><span class="line">        self.c_fc   = CastedLinear(dim, 4 * dim)</span><span class="line">        self.c_proj = CastedLinear(4 * dim, dim)</span><span class="line">        self.c_proj.weight.data.zero_() # zero init suggested by @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:</span><span class="line">        x = self.c_fc(x)</span><span class="line">        x = F.relu(x).square() # https://arxiv.org/abs/2109.08668v2; ~1-2% better than GELU; suggested by @SKYLINEZ007 and @Grad62304977</span><span class="line">        x = self.c_proj(x)</span><span class="line">        return x</span><span class="line"></span><span class="line">class Block(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, config):</span><span class="line">        super().__init__()</span><span class="line">        self.attn = CausalSelfAttention(config.n_embd, config.n_head)</span><span class="line">        self.mlp = MLP(config.n_embd)</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([1., 0.]))</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor, vi: torch.Tensor, x0: torch.Tensor, block_mask: BlockMask) -&gt; torch.Tensor:</span><span class="line">        x = self.lambdas[0] * x + self.lambdas[1] * x0</span><span class="line">        x = x + self.attn(norm(x), vi, block_mask)</span><span class="line">        x = x + self.mlp(norm(x))</span><span class="line">        return x</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># The main GPT-2 model</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class GPTConfig:</span><span class="line">    vocab_size : int = 50304</span><span class="line">    n_layer : int = 12</span><span class="line">    n_head : int = 6 # head dim 128 suggested by @Grad62304977</span><span class="line">    n_embd : int = 768</span><span class="line">    lm_head_softcap : int = 30</span><span class="line"></span><span class="line">class GPT(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, config: GPTConfig):</span><span class="line">        super().__init__()</span><span class="line">        self.n_layer = config.n_layer</span><span class="line">        self.lm_head_softcap = config.lm_head_softcap</span><span class="line"></span><span class="line">        # U-net design by @brendanh0gan</span><span class="line">        self.num_encoder_layers = config.n_layer // 2 # Half of the layers for encoder</span><span class="line">        self.num_decoder_layers = config.n_layer - self.num_encoder_layers # Remaining for decoder</span><span class="line">        # Add learnable skip connection weights for decoder layers</span><span class="line">        self.skip_weights = nn.Parameter(torch.ones(self.num_decoder_layers))</span><span class="line"></span><span class="line">        self.transformer = nn.ModuleDict(dict(</span><span class="line">            wte = nn.Embedding(config.vocab_size, config.n_embd),</span><span class="line">            # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual learning</span><span class="line">            # U-net structure on token value embeddings by @leloykun</span><span class="line">            vte = nn.Embedding(config.vocab_size, config.n_embd*self.num_encoder_layers),</span><span class="line">            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),</span><span class="line">        ))</span><span class="line">        self.lm_head = CastedLinear(config.n_embd, config.vocab_size)</span><span class="line">        self.lm_head.weight.data.zero_() # @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, idx: torch.Tensor, target: torch.Tensor, sliding_window: torch.Tensor) -&gt; torch.Tensor:</span><span class="line">        BLOCK_SIZE = 128</span><span class="line">        assert idx.ndim == 1</span><span class="line">        docs = (idx == 50256).cumsum(0)</span><span class="line">        docs_low = docs.reshape(-1, BLOCK_SIZE)[:, 0].contiguous()</span><span class="line">        docs_high = docs.reshape(-1, BLOCK_SIZE)[:, -1].contiguous()</span><span class="line">        def document_sliding_window_causal(b, h, q_idx, kv_idx):</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = docs[q_idx] == docs[kv_idx]</span><span class="line">            window_mask = q_idx - kv_idx &lt; sliding_window</span><span class="line">            return causal_mask &amp; document_mask &amp; window_mask</span><span class="line"></span><span class="line">        S = len(idx)</span><span class="line">        def create_sliding_window_causal_mask(S: int, sliding_window: torch.Tensor):</span><span class="line">            kv_idx = block_idx = torch.arange(S // BLOCK_SIZE, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">            q_idx = block_idx[:, None]</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = (docs_low[q_idx] &lt;= docs_high[kv_idx]) &amp; (docs_low[kv_idx] &lt;= docs_high[q_idx])</span><span class="line">            window_mask = q_idx - kv_idx &lt; ((sliding_window + BLOCK_SIZE - 1) // BLOCK_SIZE)</span><span class="line">            dense_mask = causal_mask &amp; document_mask &amp; window_mask</span><span class="line">            dense_mask = dense_mask.to(torch.int32)</span><span class="line">            num_blocks = dense_mask.sum(dim=-1).to(torch.int32)</span><span class="line">            indices = torch.argsort(dense_mask, dim=-1, descending=True, stable=True).to(torch.int32)</span><span class="line">            num_blocks = num_blocks[None, None, :].contiguous()</span><span class="line">            indices = indices[None, None, :].contiguous()</span><span class="line">            return BlockMask.from_kv_blocks(num_blocks, indices, BLOCK_SIZE=BLOCK_SIZE, mask_mod=document_sliding_window_causal)</span><span class="line">        block_mask = create_sliding_window_causal_mask(S, sliding_window)</span><span class="line"></span><span class="line">        # forward the GPT model itself</span><span class="line">        x = self.transformer.wte(idx[None]) # token embeddings of shape (b, t, n_embd)</span><span class="line">        x = norm(x) # @Grad62304977</span><span class="line">        x0 = x</span><span class="line">        vi = self.transformer.vte(idx[None]).chunk(self.num_encoder_layers, dim=-1)</span><span class="line"></span><span class="line">        # Store outputs for U-Net skip connections</span><span class="line">        skip_connections = []</span><span class="line">        # Encoder pass - process only the first half of the blocks</span><span class="line">        for i in range(self.num_encoder_layers):</span><span class="line">            x = self.transformer.h[i](x, vi[i], x0, block_mask)</span><span class="line">            skip_connections.append(x)</span><span class="line">        # Decoder pass - process the remaining blocks with weighted skip connections</span><span class="line">        for i in range(self.num_decoder_layers):</span><span class="line">            x = x + self.skip_weights[i] * skip_connections.pop()</span><span class="line">            # U-net structure on token value embeddings by @leloykun</span><span class="line">            x = self.transformer.h[self.num_encoder_layers + i](x, vi[self.num_encoder_layers-1-i], x0, block_mask)</span><span class="line"></span><span class="line">        x = norm(x)</span><span class="line">        logits = self.lm_head(x)</span><span class="line">        logits = self.lm_head_softcap * torch.tanh(logits / self.lm_head_softcap) # @Grad62304977</span><span class="line">        logits = logits.float()</span><span class="line">        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target.view(-1))</span><span class="line">        return loss</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Our own simple Distributed Data Loader</span><span class="line"></span><span class="line">def _peek_data_shard(file: Path):</span><span class="line">    # only reads the header, returns header data</span><span class="line">    # header is 256 int32</span><span class="line">    header = torch.from_file(f&quot;{file}&quot;, False, 256, dtype=torch.int32)</span><span class="line">    assert header[0] == 20240520, &quot;magic number mismatch in the data .bin file&quot;</span><span class="line">    assert header[1] == 1, &quot;unsupported version&quot;</span><span class="line">    return int(header[2]) # number of tokens (claimed)</span><span class="line"></span><span class="line">def _load_data_shard(file: Path, ntok: int):</span><span class="line">    with file.open(&quot;rb&quot;) as f:</span><span class="line">        tokens = torch.empty(ntok, dtype=torch.uint16, pin_memory=True)</span><span class="line">        f.seek(256 * 4)</span><span class="line">        nbytes = f.readinto(tokens.numpy())</span><span class="line">        assert nbytes == 2 * ntok, &quot;number of tokens read does not match header?&quot;</span><span class="line">    return tokens</span><span class="line"></span><span class="line">class DistributedDataLoader:</span><span class="line">    def __init__(self, filename_pattern, T, process_rank, num_processes):</span><span class="line">        self.process_rank = process_rank</span><span class="line">        self.num_processes = num_processes</span><span class="line">        self.T = T</span><span class="line"></span><span class="line">        # glob files that match the pattern</span><span class="line">        self.files = sorted(Path.cwd().glob(filename_pattern))</span><span class="line">        assert len(self.files) &gt; 0, f&quot;did not find any files that match the pattern {filename_pattern}&quot;</span><span class="line"></span><span class="line">        # load and validate all data shards, count number of tokens in total</span><span class="line">        self.ntoks = [_peek_data_shard(file) for file in self.files]</span><span class="line">        assert min(self.ntoks) &gt;= num_processes * T + 1</span><span class="line">        self.ntok_total = sum(self.ntoks)</span><span class="line"></span><span class="line">        self.reset()</span><span class="line"></span><span class="line">    def reset(self):</span><span class="line">        self.current_shard = -1</span><span class="line">        self.advance()</span><span class="line"></span><span class="line">    def advance(self): # advance to next data shard</span><span class="line">        self.current_shard = (self.current_shard + 1) % len(self.files)</span><span class="line">        self.current_position = self.process_rank * self.T</span><span class="line">        self.tokens = _load_data_shard(self.files[self.current_shard], self.ntoks[self.current_shard])</span><span class="line"></span><span class="line">    def next_batch(self):</span><span class="line">        batch_size = self.T * self.num_processes</span><span class="line">        buf = self.tokens[self.current_position:self.current_position+self.T+1]</span><span class="line">        # host side async is sufficient;</span><span class="line">        # no performance improvement was observed when introducing a separate stream.</span><span class="line">        x = buf[:-1].to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True) # inputs</span><span class="line">        y = buf[1:].to(device=&quot;cuda&quot;, dtype=torch.int64, non_blocking=True) # targets</span><span class="line">        # advance current position and load next shard if necessary</span><span class="line">        self.current_position += batch_size</span><span class="line">        if self.current_position + batch_size + 1 &gt;= len(self.tokens):</span><span class="line">            self.advance()</span><span class="line">        return x, y</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># int main</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class Hyperparameters:</span><span class="line">    # data hyperparams</span><span class="line">    input_bin : str = &#x27;data/fineweb10B/fineweb_train_*.bin&#x27; # input .bin to train on</span><span class="line">    input_val_bin : str = &#x27;data/fineweb10B/fineweb_val_*.bin&#x27; # input .bin to eval validation loss on</span><span class="line">    # optimization hyperparams</span><span class="line">    batch_size : int = 8 # batch size, in sequences, across all devices</span><span class="line">    sequence_length : int = 64*1024 # sequence length, in tokens</span><span class="line">    num_iterations : int = 1480 # number of iterations to run</span><span class="line">    warmup_iters : int = 0</span><span class="line">    cooldown_iters : int = 600 # number of iterations of linear warmup/cooldown for triangular or trapezoidal schedule</span><span class="line">    weight_decay : float = 0</span><span class="line">    # evaluation and logging hyperparams</span><span class="line">    val_loss_every : int = 125 # every how many steps to evaluate val loss? 0 for only at the end</span><span class="line">    val_tokens : int = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span><span class="line">    save_every : int = 0 # every how many steps to save the checkpoint? 0 for only at the end</span><span class="line">args = Hyperparameters()</span><span class="line"></span><span class="line"># set up DDP (distributed data parallel). torchrun sets this env variable</span><span class="line">assert torch.cuda.is_available()</span><span class="line">dist.init_process_group(backend=&#x27;nccl&#x27;)</span><span class="line">ddp_rank = int(os.environ[&#x27;RANK&#x27;])</span><span class="line">ddp_local_rank = int(os.environ[&#x27;LOCAL_RANK&#x27;])</span><span class="line">ddp_world_size = int(os.environ[&#x27;WORLD_SIZE&#x27;])</span><span class="line">device = f&#x27;cuda:{ddp_local_rank}&#x27;</span><span class="line">torch.cuda.set_device(device)</span><span class="line">print(f&quot;using device: {device}&quot;)</span><span class="line">master_process = (ddp_rank == 0) # this process will do logging, checkpointing etc.</span><span class="line"></span><span class="line"># begin logging</span><span class="line">logfile = None</span><span class="line">if master_process:</span><span class="line">    run_id = str(uuid.uuid4())</span><span class="line">    logdir = &#x27;logs/%s/&#x27; % run_id</span><span class="line">    # os.makedirs(logdir, exist_ok=True)</span><span class="line">    logfile = &#x27;logs/%s.txt&#x27; % run_id</span><span class="line">    # create the log file</span><span class="line">    with open(logfile, &quot;w&quot;) as f:</span><span class="line">        # begin the log by printing this file (the Python code)</span><span class="line">        f.write(code)</span><span class="line">        f.write(&#x27;=&#x27;*100 + &#x27;\n&#x27;)</span><span class="line">def print0(s, logonly=False):</span><span class="line">    if master_process:</span><span class="line">        with open(logfile, &quot;a&quot;) as f:</span><span class="line">            if not logonly:</span><span class="line">                print(s)</span><span class="line">            f.write(s+&#x27;\n&#x27;)</span><span class="line"># log information about the hardware/software environment this is running on</span><span class="line"># and print the full `nvidia-smi` to file</span><span class="line">print0(f&quot;Running pytorch {torch.version.__version__} compiled for CUDA {torch.version.cuda}\nnvidia-smi:&quot;)</span><span class="line">import subprocess</span><span class="line">result = subprocess.run([&#x27;nvidia-smi&#x27;], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)</span><span class="line">print0(f&#x27;{result.stdout}&#x27;, logonly=True)</span><span class="line">print0(&#x27;=&#x27;*100, logonly=True)</span><span class="line"></span><span class="line"># convenience variables</span><span class="line">T = args.sequence_length</span><span class="line"># calculate the number of steps to take in the val loop.</span><span class="line">assert args.val_tokens % (T * ddp_world_size) == 0</span><span class="line">val_steps = args.val_tokens // (T * ddp_world_size)</span><span class="line"># calculate the steps of gradient accumulation required to attain the desired global batch size.</span><span class="line">assert args.batch_size % (ddp_world_size) == 0</span><span class="line">train_accumulation_steps = args.batch_size // ddp_world_size</span><span class="line">assert train_accumulation_steps == 1</span><span class="line"></span><span class="line"># load tokens</span><span class="line">train_loader = DistributedDataLoader(args.input_bin, T, ddp_rank, ddp_world_size)</span><span class="line">val_loader = DistributedDataLoader(args.input_val_bin, T, ddp_rank, ddp_world_size)</span><span class="line">print0(f&quot;Training DataLoader: total number of tokens: {train_loader.ntok_total} across {len(train_loader.files)} files&quot;)</span><span class="line">print0(f&quot;Validation DataLoader: total number of tokens: {val_loader.ntok_total} across {len(val_loader.files)} files&quot;)</span><span class="line">print0(&#x27;=&#x27;*100, logonly=True)</span><span class="line">x, y = train_loader.next_batch()</span><span class="line"></span><span class="line"># there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency. suggested to me by @Grad62304977.</span><span class="line"># this originates from Karpathy&#x27;s experiments.</span><span class="line">num_vocab = 50304</span><span class="line">model = GPT(GPTConfig(vocab_size=num_vocab, n_layer=12, n_head=6, n_embd=768))</span><span class="line">model = model.cuda().bfloat16()</span><span class="line">for m in model.modules():</span><span class="line">    if isinstance(m, CastedLinear):</span><span class="line">        m.float()</span><span class="line">if hasattr(config, &quot;coordinate_descent_tuning&quot;):</span><span class="line">    config.coordinate_descent_tuning = True # suggested by @Chillee</span><span class="line">model = torch.compile(model)</span><span class="line"># here we wrap model into DDP container</span><span class="line">model = DDP(model, device_ids=[ddp_local_rank])</span><span class="line">raw_model = model.module # always contains the &quot;raw&quot; unwrapped model</span><span class="line"></span><span class="line"># init the optimizer(s)</span><span class="line">optimizer1 = torch.optim.Adam([raw_model.transformer.wte.weight, raw_model.transformer.vte.weight], lr=0.6, betas=(0.8, 0.95), fused=True)</span><span class="line">optimizer2 = torch.optim.Adam([raw_model.lm_head.weight], lr=0.008, betas=(0.8, 0.95), fused=True)</span><span class="line">params = list(raw_model.transformer.h.parameters())</span><span class="line">matrix_params = [p for p in params if p.ndim == 2]</span><span class="line">scalar_params = [p for p in params if p.ndim &lt; 2] + [raw_model.skip_weights]</span><span class="line">optimizer3 = Muon(matrix_params, lr=0.05, momentum=0.95)</span><span class="line">optimizer4 = torch.optim.Adam(scalar_params, lr=0.04, betas=(0.8, 0.95), fused=True)</span><span class="line">optimizers = [optimizer1, optimizer2, optimizer3, optimizer4]</span><span class="line"># learning rate decay scheduler (linear warmup and cooldown)</span><span class="line">def get_lr(it):</span><span class="line">    assert it &lt;= args.num_iterations</span><span class="line">    # 1) linear warmup for warmup_iters steps</span><span class="line">    if it &lt; args.warmup_iters:</span><span class="line">        return (it+1) / args.warmup_iters</span><span class="line">    # 2) constant lr for a while</span><span class="line">    elif it &lt; args.num_iterations - args.cooldown_iters:</span><span class="line">        return 1.0</span><span class="line">    # 3) linear cooldown</span><span class="line">    else:</span><span class="line">        decay_ratio = (args.num_iterations - it) / args.cooldown_iters</span><span class="line">        return decay_ratio</span><span class="line">schedulers = [torch.optim.lr_scheduler.LambdaLR(opt, get_lr) for opt in optimizers]</span><span class="line"></span><span class="line">sliding_window_size = torch.tensor(64, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">sw_size_prev = 64</span><span class="line"># Start training loop</span><span class="line">training_time_ms = 0</span><span class="line"># start the clock</span><span class="line">torch.cuda.synchronize()</span></pre></div>
+                    </div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 08d38857-18d8-406f-907b-c80142fec515.txt</span>
+                    <span>640 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 640 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read() # read the code of this file ASAP, for logging</span><span class="line">import uuid</span><span class="line">import time</span><span class="line">from dataclasses import dataclass</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">import torch</span><span class="line">from torch import nn</span><span class="line">import torch.nn.functional as F</span><span class="line">import torch.distributed as dist</span><span class="line">import torch._inductor.config as config</span><span class="line">from torch.nn.parallel import DistributedDataParallel as DDP</span><span class="line"># Use of FlexAttention contributed by @KoszarskyB</span><span class="line">from torch.nn.attention.flex_attention import BlockMask, flex_attention</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line">def zeropower_via_svd(G, steps=None):</span><span class="line">    U, S, V = G.svd()</span><span class="line">    return U @ V.T</span><span class="line"></span><span class="line">@torch.compile</span><span class="line">def zeropower_via_newtonschulz5(G, steps=10, eps=1e-7):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a</span><span class="line">    quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose</span><span class="line">    of minimizing steps, it turns out to be empirically effective to keep increasing the slope at</span><span class="line">    zero even beyond the point where the iteration no longer converges all the way to one everywhere</span><span class="line">    on the interval. This iteration therefore does not produce UV^T but rather something like US&#x27;V^T</span><span class="line">    where S&#x27; is diagonal with S_{ii}&#x27; ~ Uniform(0.5, 1.5), which turns out not to hurt model</span><span class="line">    performance at all relative to UV^T, where USV^T = G is the SVD.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert len(G.shape) == 2</span><span class="line">    a, b, c = (3.4445, -4.7750,  2.0315)</span><span class="line">    X = G.bfloat16()</span><span class="line">    X /= (X.norm() + eps) # ensure top singular value &lt;= 1</span><span class="line">    if G.size(0) &gt; G.size(1):</span><span class="line">        X = X.T</span><span class="line">    for _ in range(steps):</span><span class="line">        A = X @ X.T</span><span class="line">        B = b * A + c * A @ A # adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng</span><span class="line">        X = a * X + B @ X</span><span class="line">    if G.size(0) &gt; G.size(1):</span><span class="line">        X = X.T</span><span class="line">    return X</span><span class="line"></span><span class="line">zeropower_backends = dict(svd=zeropower_via_svd, newtonschulz5=zeropower_via_newtonschulz5)</span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Some warnings:</span><span class="line">    - This optimizer assumes that all parameters passed in are 2D.</span><span class="line">    - It should not be used for the embedding layer, the final fully connected layer, or any {0,1}-D</span><span class="line">    parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    - To use it with 4D convolutional filters, it works well to just flatten their last 3 dimensions.</span><span class="line">    - We believe it is unlikely to work well for training with small batch size.</span><span class="line">    - We believe it may not work well for finetuning pretrained models, but we haven&#x27;t tested this.</span><span class="line">    - We have not yet tried this optimizer for training scenarios larger than NanoGPT (124M).</span><span class="line"></span><span class="line">    Arguments:</span><span class="line">        lr: The learning rate used by the internal SGD.</span><span class="line">        momentum: The momentum used by the internal SGD.</span><span class="line">        nesterov: Whether to use Nesterov-style momentum in the internal SGD. (recommended)</span><span class="line">        backend: The chosen backend for the orthogonalization step. (recommended: &#x27;newtonschulz5&#x27;)</span><span class="line">        backend_steps: The number of iteration steps to use in the backend, if it is iterative.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, momentum=0.95, nesterov=True,</span><span class="line">                 backend=&#x27;newtonschulz5&#x27;, backend_steps=5):</span><span class="line">        self.num_process = int(os.environ[&#x27;WORLD_SIZE&#x27;])</span><span class="line">        self.rank = int(os.environ[&quot;RANK&quot;])</span><span class="line">        defaults = dict(lr=lr, momentum=momentum, nesterov=nesterov, backend=backend, backend_steps=backend_steps)</span><span class="line">        params: &quot;list[torch.Tensor]&quot; = list(params)</span><span class="line">        assert all(isinstance(p, torch.Tensor) for p in params)</span><span class="line">        sizes = {p.numel() for p in params}</span><span class="line">        param_groups = [</span><span class="line">            {</span><span class="line">                &quot;params&quot;: [p for p in params if p.numel() == size],</span><span class="line">                &quot;update_buffer&quot;: [</span><span class="line">                    torch.empty(size, device=&quot;cuda&quot;, dtype=torch.bfloat16)</span><span class="line">                    for _ in range(self.num_process)</span><span class="line">                ],</span><span class="line">            }</span><span class="line">            for size in sizes</span><span class="line">        ]</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    def step(self):</span><span class="line">        for group in self.param_groups:</span><span class="line">            lr: float = group[&quot;lr&quot;]</span><span class="line">            momentum: float = group[&quot;momentum&quot;]</span><span class="line">            nesterov: bool = group[&quot;nesterov&quot;]</span><span class="line">            zeropower_backend = zeropower_backends[group[&quot;backend&quot;]]</span><span class="line">            backend_steps: int = group[&quot;backend_steps&quot;]</span><span class="line">            update_buffers: &quot;list[torch.Tensor]&quot; = group[&quot;update_buffer&quot;]</span><span class="line">            # generate weight updates in distributed fashion</span><span class="line">            params: &quot;list[torch.Tensor]&quot; = group[&quot;params&quot;]</span><span class="line">            assert len(params) % self.num_process == 0</span><span class="line">            handle = None</span><span class="line">            params_world = None</span><span class="line">            def update_prev():</span><span class="line">                if params_world is None:</span><span class="line">                    return</span><span class="line">                assert handle is not None</span><span class="line">                handle.wait()</span><span class="line">                for p_world, g_world in zip(params_world, update_buffers):</span><span class="line">                    p_world.data.add_(</span><span class="line">                        g_world.view_as(p_world),</span><span class="line">                        alpha=-lr * max(1, p_world.size(0) / p_world.size(1)) ** 0.5,</span><span class="line">                    )</span><span class="line">            for base_i in range(len(params))[::self.num_process]:</span><span class="line">                p = params[base_i + self.rank]</span><span class="line">                g = p.grad</span><span class="line">                assert g is not None</span><span class="line">                state = self.state[p] </span><span class="line">                if &quot;momentum_buffer&quot; not in state:</span><span class="line">                    state[&quot;momentum_buffer&quot;] = torch.zeros_like(g)</span><span class="line">                buf: torch.Tensor = state[&quot;momentum_buffer&quot;]</span><span class="line">                buf.lerp_(g, 1 - momentum)</span><span class="line">                g = g.lerp_(buf, momentum) if nesterov else buf</span><span class="line">                g = zeropower_backend(g, steps=backend_steps).flatten()</span><span class="line">                update_prev()</span><span class="line">                handle = dist.all_gather(update_buffers, g, async_op=True)</span><span class="line">                params_world = params[base_i : base_i + self.num_process]</span><span class="line">            update_prev()</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># PyTorch nn.Module definitions for the GPT-2 model</span><span class="line"></span><span class="line">def norm(x):</span><span class="line">    return F.rms_norm(x, (x.size(-1),))</span><span class="line"></span><span class="line">class CastedLinear(nn.Linear):</span><span class="line"></span><span class="line">    def __init__(self, in_features, out_features):</span><span class="line">        super().__init__(in_features, out_features, bias=False)</span><span class="line"></span><span class="line">    def forward(self, x):</span><span class="line">        return F.linear(x, self.weight.to(x.dtype))</span><span class="line"></span><span class="line">class Rotary(torch.nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim, base=10000):</span><span class="line">        super().__init__()</span><span class="line">        self.register_buffer(&#x27;inv_freq&#x27;, (1 / base) ** (torch.arange(0, dim, 2) / dim))</span><span class="line">        self.seq_len_cached = None</span><span class="line">        self.cos_cached = None</span><span class="line">        self.sin_cached = None</span><span class="line"></span><span class="line">    def forward(self, x):</span><span class="line">        seq_len = x.shape[1]</span><span class="line">        if seq_len != self.seq_len_cached:</span><span class="line">            t = torch.arange(seq_len, device=x.device)</span><span class="line">            freqs = torch.outer(t, self.inv_freq)</span><span class="line">            self.seq_len_cached = seq_len</span><span class="line">            self.cos_cached = freqs.cos()</span><span class="line">            self.sin_cached = freqs.sin()</span><span class="line">        cos, sin = self.cos_cached[None, :, None, :], self.sin_cached[None, :, None, :]</span><span class="line">        # apply_rotary_emb(x, cos, sin)</span><span class="line">        x1, x2 = x.chunk(2, dim=3)</span><span class="line">        y1 = x1 * cos + x2 * sin</span><span class="line">        y2 = x1 * (-sin) + x2 * cos</span><span class="line">        return torch.cat((y1, y2), 3).type_as(x)</span><span class="line"></span><span class="line">class CausalSelfAttention(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim, n_head):</span><span class="line">        super().__init__()</span><span class="line">        assert dim % n_head == 0</span><span class="line">        self.n_head = n_head</span><span class="line">        self.c_q = CastedLinear(dim, dim)</span><span class="line">        self.c_k = CastedLinear(dim, dim)</span><span class="line">        self.c_v = CastedLinear(dim, dim)</span><span class="line">        # value residual lambda</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([0.5, 0.5])) # @Grad62304977</span><span class="line">        # rotary embeddings</span><span class="line">        self.rotary = Rotary(dim // n_head) # dim // n_head = head_dim</span><span class="line">        # output projection</span><span class="line">        self.c_proj = CastedLinear(dim, dim)</span><span class="line">        self.c_proj.weight.data.zero_() # zero init suggested by @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor, vi: torch.Tensor, block_mask: BlockMask) -&gt; torch.Tensor:</span><span class="line">        B, T = x.size(0), x.size(1) # batch size, sequence length</span><span class="line">        assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span><span class="line">        q: torch.Tensor = self.c_q(x).view(B, T, self.n_head, -1)</span><span class="line">        k: torch.Tensor = self.c_k(x).view(B, T, self.n_head, -1)</span><span class="line">        v: torch.Tensor = self.c_v(x).view(B, T, self.n_head, -1)</span><span class="line">        v = self.lambdas[0] * v + self.lambdas[1] * vi.view_as(v) # @Grad62304977</span><span class="line">        q, k = norm(q), norm(k) # QK norm suggested by @Grad62304977</span><span class="line">        q, k = self.rotary(q), self.rotary(k)</span><span class="line">        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask)</span><span class="line">        y = y.transpose(1, 2).contiguous().view_as(x) # re-assemble all head outputs side by side</span><span class="line">        y = self.c_proj(y)</span><span class="line">        return y</span><span class="line"></span><span class="line">class MLP(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, dim: int):</span><span class="line">        super().__init__()</span><span class="line">        self.c_fc   = CastedLinear(dim, 4 * dim)</span><span class="line">        self.c_proj = CastedLinear(4 * dim, dim)</span><span class="line">        self.c_proj.weight.data.zero_() # zero init suggested by @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:</span><span class="line">        x = self.c_fc(x)</span><span class="line">        x = F.relu(x).square() # https://arxiv.org/abs/2109.08668v2; ~1-2% better than GELU; suggested by @SKYLINEZ007 and @Grad62304977</span><span class="line">        x = self.c_proj(x)</span><span class="line">        return x</span><span class="line"></span><span class="line">class Block(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, config):</span><span class="line">        super().__init__()</span><span class="line">        self.attn = CausalSelfAttention(config.n_embd, config.n_head)</span><span class="line">        self.mlp = MLP(config.n_embd)</span><span class="line">        self.lambdas = nn.Parameter(torch.tensor([1., 0.]))</span><span class="line"></span><span class="line">    def forward(self, x: torch.Tensor, vi: torch.Tensor, x0: torch.Tensor, block_mask: BlockMask) -&gt; torch.Tensor:</span><span class="line">        x = self.lambdas[0] * x + self.lambdas[1] * x0</span><span class="line">        x = x + self.attn(norm(x), vi, block_mask)</span><span class="line">        x = x + self.mlp(norm(x))</span><span class="line">        return x</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># The main GPT-2 model</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class GPTConfig:</span><span class="line">    vocab_size : int = 50304</span><span class="line">    n_layer : int = 12</span><span class="line">    n_head : int = 6 # head dim 128 suggested by @Grad62304977</span><span class="line">    n_embd : int = 768</span><span class="line">    lm_head_softcap : int = 30</span><span class="line"></span><span class="line">class GPT(nn.Module):</span><span class="line"></span><span class="line">    def __init__(self, config: GPTConfig):</span><span class="line">        super().__init__()</span><span class="line">        self.n_layer = config.n_layer</span><span class="line">        self.lm_head_softcap = config.lm_head_softcap</span><span class="line"></span><span class="line">        # U-net design by @brendanh0gan</span><span class="line">        self.num_encoder_layers = config.n_layer // 2 # Half of the layers for encoder</span><span class="line">        self.num_decoder_layers = config.n_layer - self.num_encoder_layers # Remaining for decoder</span><span class="line">        # Add learnable skip connection weights for decoder layers</span><span class="line">        self.skip_weights = nn.Parameter(torch.ones(self.num_decoder_layers))</span><span class="line"></span><span class="line">        self.transformer = nn.ModuleDict(dict(</span><span class="line">            wte = nn.Embedding(config.vocab_size, config.n_embd),</span><span class="line">            # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual learning</span><span class="line">            # U-net structure on token value embeddings by @leloykun</span><span class="line">            vte = nn.Embedding(config.vocab_size, config.n_embd*self.num_encoder_layers),</span><span class="line">            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),</span><span class="line">        ))</span><span class="line">        self.lm_head = CastedLinear(config.n_embd, config.vocab_size)</span><span class="line">        self.lm_head.weight.data.zero_() # @Grad62304977</span><span class="line"></span><span class="line">    def forward(self, idx: torch.Tensor, target: torch.Tensor, sliding_window: torch.Tensor) -&gt; torch.Tensor:</span><span class="line">        BLOCK_SIZE = 128</span><span class="line">        assert idx.ndim == 1</span><span class="line">        docs = (idx == 50256).cumsum(0)</span><span class="line">        docs_low = docs.reshape(-1, BLOCK_SIZE)[:, 0].contiguous()</span><span class="line">        docs_high = docs.reshape(-1, BLOCK_SIZE)[:, -1].contiguous()</span><span class="line">        def document_sliding_window_causal(b, h, q_idx, kv_idx):</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = docs[q_idx] == docs[kv_idx]</span><span class="line">            window_mask = q_idx - kv_idx &lt; sliding_window</span><span class="line">            return causal_mask &amp; document_mask &amp; window_mask</span><span class="line"></span><span class="line">        S = len(idx)</span><span class="line">        def create_sliding_window_causal_mask(S: int, sliding_window: torch.Tensor):</span><span class="line">            kv_idx = block_idx = torch.arange(S // BLOCK_SIZE, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">            q_idx = block_idx[:, None]</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = (docs_low[q_idx] &lt;= docs_high[kv_idx]) &amp; (docs_low[kv_idx] &lt;= docs_high[q_idx])</span><span class="line">            window_mask = q_idx - kv_idx &lt; ((sliding_window + BLOCK_SIZE - 1) // BLOCK_SIZE)</span><span class="line">            dense_mask = causal_mask &amp; document_mask &amp; window_mask</span><span class="line">            dense_mask = dense_mask.to(torch.int32)</span><span class="line">            num_blocks = dense_mask.sum(dim=-1).to(torch.int32)</span><span class="line">            indices = torch.argsort(dense_mask, dim=-1, descending=True, stable=True).to(torch.int32)</span><span class="line">            num_blocks = num_blocks[None, None, :].contiguous()</span><span class="line">            indices = indices[None, None, :].contiguous()</span><span class="line">            return BlockMask.from_kv_blocks(num_blocks, indices, BLOCK_SIZE=BLOCK_SIZE, mask_mod=document_sliding_window_causal)</span><span class="line">        block_mask = create_sliding_window_causal_mask(S, sliding_window)</span><span class="line"></span><span class="line">        # forward the GPT model itself</span><span class="line">        x = self.transformer.wte(idx[None]) # token embeddings of shape (b, t, n_embd)</span><span class="line">        x = norm(x) # @Grad62304977</span><span class="line">        x0 = x</span><span class="line">        vi = self.transformer.vte(idx[None]).chunk(self.num_encoder_layers, dim=-1)</span><span class="line"></span><span class="line">        # Store outputs for U-Net skip connections</span><span class="line">        skip_connections = []</span><span class="line">        # Encoder pass - process only the first half of the blocks</span><span class="line">        for i in range(self.num_encoder_layers):</span><span class="line">            x = self.transformer.h[i](x, vi[i], x0, block_mask)</span><span class="line">            skip_connections.append(x)</span><span class="line">        # Decoder pass - process the remaining blocks with weighted skip connections</span><span class="line">        for i in range(self.num_decoder_layers):</span><span class="line">            x = x + self.skip_weights[i] * skip_connections.pop()</span><span class="line">            # U-net structure on token value embeddings by @leloykun</span><span class="line">            x = self.transformer.h[self.num_encoder_layers + i](x, vi[self.num_encoder_layers-1-i], x0, block_mask)</span><span class="line"></span><span class="line">        x = norm(x)</span><span class="line">        logits = self.lm_head(x)</span><span class="line">        logits = self.lm_head_softcap * torch.tanh(logits / self.lm_head_softcap) # @Grad62304977</span><span class="line">        logits = logits.float()</span><span class="line">        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target.view(-1))</span><span class="line">        return loss</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Our own simple Distributed Data Loader</span><span class="line"></span><span class="line">def _peek_data_shard(file: Path):</span><span class="line">    # only reads the header, returns header data</span><span class="line">    # header is 256 int32</span><span class="line">    header = torch.from_file(f&quot;{file}&quot;, False, 256, dtype=torch.int32)</span><span class="line">    assert header[0] == 20240520, &quot;magic number mismatch in the data .bin file&quot;</span><span class="line">    assert header[1] == 1, &quot;unsupported version&quot;</span><span class="line">    return int(header[2]) # number of tokens (claimed)</span><span class="line"></span><span class="line">def _load_data_shard(file: Path, ntok: int):</span><span class="line">    with file.open(&quot;rb&quot;) as f:</span><span class="line">        tokens = torch.empty(ntok, dtype=torch.uint16, pin_memory=True)</span><span class="line">        f.seek(256 * 4)</span><span class="line">        nbytes = f.readinto(tokens.numpy())</span><span class="line">        assert nbytes == 2 * ntok, &quot;number of tokens read does not match header?&quot;</span><span class="line">    return tokens</span><span class="line"></span><span class="line">class DistributedDataLoader:</span><span class="line">    def __init__(self, filename_pattern, T, process_rank, num_processes):</span><span class="line">        self.process_rank = process_rank</span><span class="line">        self.num_processes = num_processes</span><span class="line">        self.T = T</span><span class="line"></span><span class="line">        # glob files that match the pattern</span><span class="line">        self.files = sorted(Path.cwd().glob(filename_pattern))</span><span class="line">        assert len(self.files) &gt; 0, f&quot;did not find any files that match the pattern {filename_pattern}&quot;</span><span class="line"></span><span class="line">        # load and validate all data shards, count number of tokens in total</span><span class="line">        self.ntoks = [_peek_data_shard(file) for file in self.files]</span><span class="line">        assert min(self.ntoks) &gt;= num_processes * T + 1</span><span class="line">        self.ntok_total = sum(self.ntoks)</span><span class="line"></span><span class="line">        self.reset()</span><span class="line"></span><span class="line">    def reset(self):</span><span class="line">        self.current_shard = -1</span><span class="line">        self.advance()</span><span class="line"></span><span class="line">    def advance(self): # advance to next data shard</span><span class="line">        self.current_shard = (self.current_shard + 1) % len(self.files)</span><span class="line">        self.current_position = self.process_rank * self.T</span><span class="line">        self.tokens = _load_data_shard(self.files[self.current_shard], self.ntoks[self.current_shard])</span><span class="line"></span><span class="line">    def next_batch(self):</span><span class="line">        batch_size = self.T * self.num_processes</span><span class="line">        buf = self.tokens[self.current_position:self.current_position+self.T+1]</span><span class="line">        # host side async is sufficient;</span><span class="line">        # no performance improvement was observed when introducing a separate stream.</span><span class="line">        x = buf[:-1].to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True) # inputs</span><span class="line">        y = buf[1:].to(device=&quot;cuda&quot;, dtype=torch.int64, non_blocking=True) # targets</span><span class="line">        # advance current position and load next shard if necessary</span><span class="line">        self.current_position += batch_size</span><span class="line">        if self.current_position + batch_size + 1 &gt;= len(self.tokens):</span><span class="line">            self.advance()</span><span class="line">        return x, y</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># int main</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class Hyperparameters:</span><span class="line">    # data hyperparams</span><span class="line">    input_bin : str = &#x27;data/fineweb10B/fineweb_train_*.bin&#x27; # input .bin to train on</span><span class="line">    input_val_bin : str = &#x27;data/fineweb10B/fineweb_val_*.bin&#x27; # input .bin to eval validation loss on</span><span class="line">    # optimization hyperparams</span><span class="line">    batch_size : int = 8 # batch size, in sequences, across all devices</span><span class="line">    sequence_length : int = 64*1024 # sequence length, in tokens</span><span class="line">    num_iterations : int = 1480 # number of iterations to run</span><span class="line">    warmup_iters : int = 0</span><span class="line">    cooldown_iters : int = 600 # number of iterations of linear warmup/cooldown for triangular or trapezoidal schedule</span><span class="line">    weight_decay : float = 0</span><span class="line">    # evaluation and logging hyperparams</span><span class="line">    val_loss_every : int = 125 # every how many steps to evaluate val loss? 0 for only at the end</span><span class="line">    val_tokens : int = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span><span class="line">    save_every : int = 0 # every how many steps to save the checkpoint? 0 for only at the end</span><span class="line">args = Hyperparameters()</span><span class="line"></span><span class="line"># set up DDP (distributed data parallel). torchrun sets this env variable</span><span class="line">assert torch.cuda.is_available()</span><span class="line">dist.init_process_group(backend=&#x27;nccl&#x27;)</span><span class="line">ddp_rank = int(os.environ[&#x27;RANK&#x27;])</span><span class="line">ddp_local_rank = int(os.environ[&#x27;LOCAL_RANK&#x27;])</span><span class="line">ddp_world_size = int(os.environ[&#x27;WORLD_SIZE&#x27;])</span><span class="line">device = f&#x27;cuda:{ddp_local_rank}&#x27;</span><span class="line">torch.cuda.set_device(device)</span><span class="line">print(f&quot;using device: {device}&quot;)</span><span class="line">master_process = (ddp_rank == 0) # this process will do logging, checkpointing etc.</span><span class="line"></span><span class="line"># begin logging</span><span class="line">logfile = None</span><span class="line">if master_process:</span><span class="line">    run_id = str(uuid.uuid4())</span><span class="line">    logdir = &#x27;logs/%s/&#x27; % run_id</span><span class="line">    # os.makedirs(logdir, exist_ok=True)</span><span class="line">    logfile = &#x27;logs/%s.txt&#x27; % run_id</span><span class="line">    # create the log file</span><span class="line">    with open(logfile, &quot;w&quot;) as f:</span><span class="line">        # begin the log by printing this file (the Python code)</span><span class="line">        f.write(code)</span><span class="line">        f.write(&#x27;=&#x27;*100 + &#x27;\n&#x27;)</span><span class="line">def print0(s, logonly=False):</span><span class="line">    if master_process:</span><span class="line">        with open(logfile, &quot;a&quot;) as f:</span><span class="line">            if not logonly:</span><span class="line">                print(s)</span><span class="line">            f.write(s+&#x27;\n&#x27;)</span><span class="line"># log information about the hardware/software environment this is running on</span><span class="line"># and print the full `nvidia-smi` to file</span><span class="line">print0(f&quot;Running pytorch {torch.version.__version__} compiled for CUDA {torch.version.cuda}\nnvidia-smi:&quot;)</span><span class="line">import subprocess</span><span class="line">result = subprocess.run([&#x27;nvidia-smi&#x27;], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)</span><span class="line">print0(f&#x27;{result.stdout}&#x27;, logonly=True)</span><span class="line">print0(&#x27;=&#x27;*100, logonly=True)</span><span class="line"></span><span class="line"># convenience variables</span><span class="line">T = args.sequence_length</span><span class="line"># calculate the number of steps to take in the val loop.</span><span class="line">assert args.val_tokens % (T * ddp_world_size) == 0</span><span class="line">val_steps = args.val_tokens // (T * ddp_world_size)</span><span class="line"># calculate the steps of gradient accumulation required to attain the desired global batch size.</span><span class="line">assert args.batch_size % (ddp_world_size) == 0</span><span class="line">train_accumulation_steps = args.batch_size // ddp_world_size</span><span class="line">assert train_accumulation_steps == 1</span><span class="line"></span><span class="line"># load tokens</span><span class="line">train_loader = DistributedDataLoader(args.input_bin, T, ddp_rank, ddp_world_size)</span><span class="line">val_loader = DistributedDataLoader(args.input_val_bin, T, ddp_rank, ddp_world_size)</span><span class="line">print0(f&quot;Training DataLoader: total number of tokens: {train_loader.ntok_total} across {len(train_loader.files)} files&quot;)</span><span class="line">print0(f&quot;Validation DataLoader: total number of tokens: {val_loader.ntok_total} across {len(val_loader.files)} files&quot;)</span><span class="line">print0(&#x27;=&#x27;*100, logonly=True)</span><span class="line">x, y = train_loader.next_batch()</span><span class="line"></span><span class="line"># there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency. suggested to me by @Grad62304977.</span><span class="line"># this originates from Karpathy&#x27;s experiments.</span><span class="line">num_vocab = 50304</span><span class="line">model = GPT(GPTConfig(vocab_size=num_vocab, n_layer=12, n_head=6, n_embd=768))</span><span class="line">model = model.cuda().bfloat16()</span><span class="line">for m in model.modules():</span><span class="line">    if isinstance(m, CastedLinear):</span><span class="line">        m.float()</span><span class="line">if hasattr(config, &quot;coordinate_descent_tuning&quot;):</span><span class="line">    config.coordinate_descent_tuning = True # suggested by @Chillee</span><span class="line">model = torch.compile(model)</span><span class="line"># here we wrap model into DDP container</span><span class="line">model = DDP(model, device_ids=[ddp_local_rank])</span><span class="line">raw_model = model.module # always contains the &quot;raw&quot; unwrapped model</span><span class="line"></span><span class="line"># init the optimizer(s)</span><span class="line">optimizer1 = torch.optim.Adam([raw_model.transformer.wte.weight, raw_model.transformer.vte.weight], lr=0.6, betas=(0.8, 0.95), fused=True)</span><span class="line">optimizer2 = torch.optim.Adam([raw_model.lm_head.weight], lr=0.008, betas=(0.8, 0.95), fused=True)</span><span class="line">params = list(raw_model.transformer.h.parameters())</span><span class="line">matrix_params = [p for p in params if p.ndim == 2]</span><span class="line">scalar_params = [p for p in params if p.ndim &lt; 2] + [raw_model.skip_weights]</span><span class="line">optimizer3 = Muon(matrix_params, lr=0.05, momentum=0.95)</span><span class="line">optimizer4 = torch.optim.Adam(scalar_params, lr=0.04, betas=(0.8, 0.95), fused=True)</span><span class="line">optimizers = [optimizer1, optimizer2, optimizer3, optimizer4]</span><span class="line"># learning rate decay scheduler (linear warmup and cooldown)</span><span class="line">def get_lr(it):</span><span class="line">    assert it &lt;= args.num_iterations</span><span class="line">    # 1) linear warmup for warmup_iters steps</span><span class="line">    if it &lt; args.warmup_iters:</span><span class="line">        return (it+1) / args.warmup_iters</span><span class="line">    # 2) constant lr for a while</span><span class="line">    elif it &lt; args.num_iterations - args.cooldown_iters:</span><span class="line">        return 1.0</span><span class="line">    # 3) linear cooldown</span><span class="line">    else:</span><span class="line">        decay_ratio = (args.num_iterations - it) / args.cooldown_iters</span><span class="line">        return decay_ratio</span><span class="line">schedulers = [torch.optim.lr_scheduler.LambdaLR(opt, get_lr) for opt in optimizers]</span><span class="line"></span><span class="line">sliding_window_size = torch.tensor(64, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">sw_size_prev = 64</span><span class="line"># Start training loop</span><span class="line">training_time_ms = 0</span><span class="line"># start the clock</span><span class="line">torch.cuda.synchronize()</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r14_14_12-04-24.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r16_16_12-10-24.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

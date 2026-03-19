@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #9 — Add two value embeddings | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 2: GPT-2 Medium → Record #9
+        </div>
+        <div class="detail-title">#9: Add two value embeddings</div>
+        <div class="detail-time">24.12 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span>
+            <span style="color:var(--muted);margin-left:1rem">08/28/25</span>
+            <span style="color:var(--muted)">by @snimu</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Add two value embeddings</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>Adding value embeddings to the Medium track, similar to Small track records 14-17.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Value embeddings at scale</li><li>Cross-track technique transfer</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #119: record 2025-08-28; medium track; two more value-embeddings</span>
+                <span class="diff-stats">
+                    <span class="add">+6622</span> / <span class="del">-14</span> in 3 files
+                    — by @snimu
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p>New Medium Track record.
+
+Changelog to baseline:
+
+<ul><li>Removed the <code>torch._dynamo.config.compiled_autograd = True</code> flag (it caused flexattention errors)</li>
+<li>Removed the <code>_patched_trace_structured</code> function (it often causes errors)</li></ul>
+
+Mean time: 24.15 minutes
+
+Changelog to record:
+
+<ul><li>Added two more value embeddings</li></ul>
+  - Previously, the three value embeddings were applied to the layers: 0&amp;13, 1&amp;14, 2&amp;15
+  - Now, the five value embeddings are applied to the layers: 0&amp;11, 1&amp;12, 2&amp;13, 3&amp;14, 4&amp;15
+<ul><li>Reduced step count from 5890 to 5820</li></ul>
+
+Mean time: 23.8 minutes
+
+PyTorch version: <code>torch==2.9.0.dev20250824+cu126</code>
+
+For details, see the README.md that comes with the record, or <a href="https://github.com/snimu/modded-nanogpt-experiments/tree/main/experiments/00003-value-embeddings" target="_blank">this link</a>.</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #119)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt_medium.py</span>
+                        <span class="diff-stats"><span class="add">+5</span> <span class="del">-14</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -18,7 +18,6 @@</span>
+<span class="diff-ctx"> # use of FlexAttention contributed by @KoszarskyB</span>
+<span class="diff-ctx"> from torch.nn.attention.flex_attention import BlockMask, flex_attention</span>
+<span class="diff-ctx"> torch._inductor.config.coordinate_descent_tuning = True # we allow this flag for medium track</span>
+<span class="diff-del">-torch._dynamo.config.compiled_autograd = True</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-ctx"> # Muon optimizer</span>
+<span class="diff-hunk">@@ -216,7 +215,7 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, model_dim:</span>
+<span class="diff-ctx">         self.embed = nn.Embedding(vocab_size, model_dim)</span>
+<span class="diff-ctx">         # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual implementation following https://arxiv.org/abs/2410.17897</span>
+<span class="diff-ctx">         # value embedding code simplification inspired by @ragulpr https://github.com/KellerJordan/modded-nanogpt/pull/78</span>
+<span class="diff-del">-        self.value_embeds = nn.ModuleList([nn.Embedding(vocab_size, model_dim) for _ in range(3)])</span>
+<span class="diff-add">+        self.value_embeds = nn.ModuleList([nn.Embedding(vocab_size, model_dim) for _ in range(5)])</span>
+<span class="diff-ctx">         self.blocks = nn.ModuleList([Block(model_dim, num_heads, max_seq_len, i) for i in range(num_layers)])</span>
+<span class="diff-ctx">         # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span>
+<span class="diff-ctx">         # suggested to me by @Grad62304977. this originates from Karpathy&#x27;s experiments.</span>
+<span class="diff-hunk">@@ -274,7 +273,7 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_bloc</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         ve = [value_embed(input_seq) for value_embed in self.value_embeds]</span>
+<span class="diff-ctx">         # 012 ... 012 structure on token value embeddings by @YouJiacheng, improved on @leloykun&#x27;s U-net structure</span>
+<span class="diff-del">-        ve = [ve[0], ve[1], ve[2]] + [None] * (len(self.blocks) - 6) + [ve[0], ve[1], ve[2]]</span>
+<span class="diff-add">+        ve = [ve[0], ve[1], ve[2], ve[3], ve[4]] + [None] * (len(self.blocks) - 10) + [ve[0], ve[1], ve[2], ve[3], ve[4]]</span>
+<span class="diff-ctx">         assert len(ve) == len(self.blocks)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         long_bm, short_bm = self.create_blockmasks(input_seq, sliding_window_num_blocks)</span>
+<span class="diff-hunk">@@ -352,7 +351,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx">     train_seq_len = 64*1024 # FlexAttention sequence length</span>
+<span class="diff-ctx">     val_seq_len = 4*64*1024 # FlexAttention sequence length for validation</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_iterations = 5960 # number of iterations to run</span>
+<span class="diff-add">+    num_iterations = 5820 # number of iterations to run</span>
+<span class="diff-ctx">     cooldown_frac = 0.7 # fraction of training spent cooling down the learning rate</span>
+<span class="diff-ctx">     # architecture</span>
+<span class="diff-ctx">     vocab_size = 50257</span>
+<span class="diff-hunk">@@ -385,15 +384,6 @@ def print0(s, console=False):</span>
+<span class="diff-ctx">             if console:</span>
+<span class="diff-ctx">                 print(s)</span>
+<span class="diff-ctx">             print(s, file=f)</span>
+<span class="diff-del">-from torch._logging._internal import trace_structured # noqa: E402</span>
+<span class="diff-del">-import torch._inductor.codecache # noqa: E402</span>
+<span class="diff-del">-import torch._inductor.graph # noqa: E402</span>
+<span class="diff-del">-def _patched_trace_structured(name, metadata_fn, **kwargs):</span>
+<span class="diff-del">-    if name == &quot;inductor_output_code&quot;:</span>
+<span class="diff-del">-        print0(f&quot;inductor_output_code: {metadata_fn().get(&quot;filename&quot;, &quot;Unknown&quot;)}&quot;)</span>
+<span class="diff-del">-    trace_structured(name, metadata_fn, **kwargs)</span>
+<span class="diff-del">-torch._inductor.codecache.trace_structured = _patched_trace_structured</span>
+<span class="diff-del">-torch._inductor.graph.trace_structured = _patched_trace_structured</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # begin by printing this file (the Python code)</span>
+<span class="diff-ctx"> print0(code)</span>
+<span class="diff-hunk">@@ -475,7 +465,8 @@ def get_window_size_blocks(step: int):</span>
+<span class="diff-ctx"> # Warmup the training kernels, then re-initialize the state so we aren&#x27;t cheating</span>
+<span class="diff-ctx"> warmup_steps = 10</span>
+<span class="diff-ctx"> initial_state = copy.deepcopy(dict(model=model.state_dict(), optimizers=[opt.state_dict() for opt in optimizers]))</span>
+<span class="diff-del">-for _ in range(warmup_steps):</span>
+<span class="diff-add">+for warmup_step in range(warmup_steps):</span>
+<span class="diff-add">+    print0(f&quot;Warmup step {warmup_step+1}/{warmup_steps}&quot;)</span>
+<span class="diff-ctx">     inputs = targets = torch.randint(0, args.vocab_size, size=(args.train_seq_len,), device=&quot;cuda&quot;)</span>
+<span class="diff-ctx">     model(inputs.to(torch.int32), targets, get_window_size_blocks(0)).backward()</span>
+<span class="diff-ctx">     for param in model.parameters():</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #119)</span>
+                    <span>2 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/082825_Medium_NewValemb/036_61ef4351-7b68-4897-b440-a99221a1a629.txt <span class="add" style="color:var(--green)">+6502</span></li><li style="color:var(--muted);font-size:0.85rem">records/082825_Medium_NewValemb/README.md <span class="add" style="color:var(--green)">+115</span></li></ul></div>
+                </div>
+            </div>
+    
+    
+
+    <div class="nav-buttons">
+        <a href="track_2_medium_r87_8_04-22-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_2_medium_r89_10_09-11-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

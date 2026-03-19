@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #56 — Optimize and compile Adam, increase Adam buffer precision, move gates from Muon to Adam parameter banks | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #56
+        </div>
+        <div class="detail-title">#56: Optimize and compile Adam, increase Adam buffer precision, move gates from Muon to Adam parameter banks</div>
+        <div class="detail-time">1.894 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span>
+            <span style="color:var(--muted);margin-left:1rem">12/31/25</span>
+            <span style="color:var(--muted)">by @ChrisJMcCormick</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Optimize and compile Adam + increase buffer precision + move gates to Adam</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>torch.compile on Adam optimizer reduces Python overhead. Higher precision Adam buffers prevent accumulation errors. Moving gate parameters to Adam gives them independent optimization.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Compiled optimizer</li><li>Adam buffer precision</li><li>Parameter bank assignment</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>optimizer + systems</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #187: New Record: Move Gates to Adam with float32 state and compiled update, -20 steps</span>
+                <span class="diff-stats">
+                    <span class="add">+89426</span> / <span class="del">-50</span> in 29 files
+                    — by @chrisjmccormick
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p>One last one to wrap up 2025.
+
+This record includes multiple changes to Adam:
+
+1. Attention and VE gates moved to Adam, and defined as parameter banks for comms efficiency.
+2. float32 state (<code>exp_avg</code> and <code>exp_avg_sq</code> buffers) for all Adam parameters.
+3. Compiled helper function for Adam update math.
+
+``<code>
+                            Runs   Time μ  Time σ  Time +/-  Loss μ  Loss σ  Loss +/-      p
+12-29-baseline                 7 114.4301  0.0283    0.0000  3.2787  0.0009    0.0000 0.0036
+12-31-gates-to-adam            7 114.1380  0.1078   -0.2921  3.2774  0.0010   -0.0013 0.0003
+12-31-gates-to-adam-20stps    10 112.9730  0.0692   -1.4571  3.2789  0.0010    0.0002 0.0031
+</code>`<code>
+
+My initial commit was showing a more significant time improvement (without removing steps), but had a very high variance on the runtime. I re-ran to get the above results, and the variance was still fairly high--108ms. 
+Oddly, after removing 20 steps to take advantage of the decrease in loss, the times were much more stable again. 
+All 24 runs were on the same machine, run consecutively.
+
+Here are the individual runs:
+
+</code>`<code>
+12-29-baseline:
+  losses = [3.2778, 3.2774, 3.2788, 3.2794, 3.2791, 3.2787, 3.2798]
+  times  = [114.4190, 114.4200, 114.4760, 114.4620, 114.4140, 114.3960, 114.4240]
+  (n = 7)
+
+12-31-gates-to-adam:
+  losses = [3.2772, 3.2771, 3.2783, 3.2756, 3.2784, 3.2772, 3.2783]
+  times  = [114.2900, 114.0690, 114.2260, 114.0950, 114.2260, 114.0050, 114.0550]
+  (n = 7)
+
+12-31-gates-to-adam-20stps:
+  losses = [3.2794, 3.2780, 3.2791, 3.2788, 3.2786, 3.2780, 3.2804, 3.2802, 3.2774, 3.2793]
+  times  = [112.8490, 112.9770, 113.1200, 113.0130, 112.9440, 112.9710, 112.9860, 112.9150, 112.9730, 112.9820]
+  (n = 10)
+</code>`<code>
+
+<h3>Gates Moved to Adam</h3>
+
+I logged some weight values from the attention and value embedding gates and they were exhibiting noise that looked similar to how the smear gate was previously.
+
+Moving them to Adam smoothed them out significantly. The loss didn&#x27;t clearly improve from that change alone, but did have lower variance.
+
+
+&lt;img width=&quot;3094&quot; height=&quot;913&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/bc837acb-4b0d-415c-9874-7309ce020b8d&quot; /&gt;
+
+(Note: The blue line is illustrative of the effect, but includes some changes which I ultimately backed out, explained at the end)
+
+Moving these gates does result in Adam managing a large number of additional parameters--10 attention gate parameters and 5 ve gate parameters. Each of these is handled separately, meaning separate kernel calls and communication.
+
+To address this, I &quot;pre-stacked&quot; the weights across the layers into two parameters.
+
+<h3>Gate Parameter Banks</h3>
+
+This pre-stacking is what I&#x27;ve been referring to as a &quot;parameter bank&quot; approach. The attention gates for all 10 attention modules are defined as a single nn.Parameter with shape (10, 6, 12)--10 layers, 6 heads, 12-dims. Similarly the ve gates are a single (5, 6, 12) nn.Parameter.
+
+Adding the batch dimension means that they can be used by the individual layers with just a </code>view<code>--no slicing required (which could impact compute).
+
+Because these gate banks are a small number of parameters, they follow the </code>all_reduce<code> path in Adam, where every GPU works on the full set of the gradients instead of dividing up the work.
+
+<h3>Parameter Bank Workarounds</h3>
+
+Parameter banks require defining the parameter at the top level (in the GPT class), and then passing the appropriate portion down to the individual modules.
+
+There are a few challenges with this approach that require some unfortunate workarounds.
+
+First, it would be nice / feel more natural to pass a view to each module during init. However, views do not follow device movement, so when we call </code>model.to<code> the views would need to be re-created. To resolve this, I pass the view of the gate weights as an argument to attn.forward call, which just looks a little odd.
+
+The second issue is that I noticed from profiling the code that it was using some less efficient kernels in the backwards path. I don&#x27;t have a deep understanding of the fundamental issue, or how the workaround addresses it, but here it is. 
+
+* The issue: Passing a view of the weights into each forward call forces torch.compile to use a less efficient </code>select_backward<code> kernel.
+* The workaround: You can resolve this by calling </code>unbind(0)<code> on the bank in </code>GPT.forward<code> to turn the 3D bank into a python tuple of 2D weight matrices.
+
+<h3>Float32 Adam State</h3>
+
+I discovered by accident that, while the embedding tables and gate weights are bfloat16, it appears to be slightly faster and lowers the loss if the Adam optimizer state (the </code>exp_avg<code> and </code>exp_avg_sq<code> buffers) are stored as float32. 
+
+</code>`<code>
+                              Runs     Time μ  Time σ  Loss μ  Loss σ       p
+weights bf16 - state bf16        4   113.8900  0.2746  3.2786  0.0009  0.0243
+weights bf16 - state fp32        5   113.8622  0.4169  3.2777  0.0010  0.0036
+</code>`<code>
+
+<h3>Fused Update Function</h3>
+
+We can fully fuse the Adam operations using the same techniques I applied to Muon for cautious weight decay and the variance normalization:
+
+* 0-D cpu tensors for passing in values which change frequently, and 
+* using low-level pytorch operators which:
+    * perform operations in-place to avoid additional memory traffic
+    * eliminate edge cases which prevent </code>torch.compile<code> from fusing the operations
+
+I added a helper function to perform the math, with </code>@torch.compile(dynamic=False, fullgraph=True)<code> to achieve the fusion.
+
+The amount this reduces the Adam compute is remarkable:
+
+&lt;img width=&quot;4156&quot; height=&quot;1342&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/31d2a736-9293-4703-bca9-218b3fb3e254&quot; /&gt;
+
+Also note that the gates (the first of the three muon blocks in the baseline) are moved.
+
+Here&#x27;s a closer look at the Adam block:
+
+&lt;img width=&quot;1857&quot; height=&quot;1235&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/1fc5ab48-70b9-4fbd-adfc-4a88bca87012&quot; /&gt;
+
+The change does come at the cost of readability, though--it replaces the nice, legibile &quot;code that looks like math&quot; pytorch operators with explicit function calls.
+
+To balance this somewhat, I added comments to each line which show what they&#x27;re doing in the simpler pytorch syntax. Here&#x27;s the helper function.
+
+</code>`<code>python
+    @staticmethod
+    @torch.compile(dynamic=False, fullgraph=True)
+    def _update_step(p_slice, g_slice, exp_avg, exp_avg_sq, beta1, beta2, eps, step_size_t, eff_wd_t):
+        &quot;&quot;&quot;Compiled Adam update step. step_size_t and eff_wd_t are 0-D CPU tensors to avoid recompilation.&quot;&quot;&quot;
+        exp_avg.mul_(beta1).add_(g_slice, alpha=1 - beta1)  # exp_avg = beta1 * exp_avg + (1 - beta1) * g_slice
+        exp_avg_sq.mul_(beta2).addcmul_(g_slice, g_slice, value=1 - beta2)  # exp_avg_sq = beta2 * exp_avg_sq + (1 - beta2) * g_slice^2
+        # compute step
+        update = exp_avg.div(exp_avg_sq.sqrt().add_(eps)).mul_(step_size_t)  # update = (exp_avg / (sqrt(exp_avg_sq) + eps)) * step_size
+        # cautious weight decay
+        mask = (update * p_slice) &gt; 0
+        update.addcmul_(p_slice, mask, value=eff_wd_t)  # update += eff_wd_t * p_slice * mask
+        p_slice.add_(other=update, alpha=-1.0)  # p_slice -= update
+</code>``
+
+<h3>Frozen Scalars</h3>
+
+I fixed the code for freezing the scalars; freezing for 40 steps reduced total training time by ~150ms, but increased loss.
+
+I tried moving the gates to the same Adam instance as the scalars to leverage the higher beta values, and froze them for 30 steps. The plots looked good and I got a run with a particularly low loss, but it was a red herring.
+
+I tried doing my final runs with that arrangement and reduced steps, but the variance was too high, so I&#x27;m falling back on earlier results with no reduction in steps. I&#x27;ll have to play with the configuration more another time.
+
+Update: Added screenshots of traces
+Update: Added results of new runs</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #187)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt.py</span>
+                        <span class="diff-stats"><span class="add">+87</span> <span class="del">-50</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -476,17 +476,13 @@ class NorMuon(torch.optim.Optimizer):</span>
+<span class="diff-ctx">     dist.reduce_scatter_tensor() call. The model architecture has been customized to enable</span>
+<span class="diff-ctx">     (n_attn_layers+n_mlp_layers*2)%8==0 for batching across 8 GPUs with zero padding on mlp and attn.</span>
+<span class="diff-ctx">     The scheduling is:</span>
+<span class="diff-del">-        1. reduce scatter attn_gate (10 params 6 padding params)</span>
+<span class="diff-del">-        2. reduce scatter attn/mlp round 1 (10 attn params 6 mlp params)</span>
+<span class="diff-del">-        3. reduce scatter attn/mlp round 2 (16 mlp params)</span>
+<span class="diff-del">-        4. wait on step 1, then compute update of 1 and schedule all gather</span>
+<span class="diff-del">-        5. wait on step 2, then compute update of 2 and schedule all gather</span>
+<span class="diff-del">-        6. wait on step 3, then compute update of 3 and schedule all gather</span>
+<span class="diff-add">+        1. reduce scatter attn/mlp round 1 (10 attn params 6 mlp params)</span>
+<span class="diff-add">+        2. reduce scatter attn/mlp round 2 (16 mlp params)</span>
+<span class="diff-add">+        3. wait on step 1, then compute update of 1 and schedule all gather</span>
+<span class="diff-add">+        4. wait on step 2, then compute update of 2 and schedule all gather</span>
+<span class="diff-ctx">             GPUs receive [2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 MLP, 2 MLP, 2 MLP]</span>
+<span class="diff-ctx">             GPUs that receive params of type attn reshape before computing update</span>
+<span class="diff-del">-        7. wait on 4, then compute update of 4 and schedule all gather</span>
+<span class="diff-del">-        8. wait for each all gather to complete and update params</span>
+<span class="diff-del">-    Empirically, leading with small params provides an additional 0.2s improvement.</span>
+<span class="diff-add">+        5. wait for each all gather to complete and update params</span>
+<span class="diff-ctx">     &quot;&quot;&quot;</span>
+<span class="diff-ctx">     def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95, beta2=0.95, custom_sizing=True):</span>
+<span class="diff-ctx">         defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum, beta2=beta2)</span>
+<span class="diff-hunk">@@ -527,8 +523,8 @@ def generate_custom_param_groups(self, params):</span>
+<span class="diff-ctx">         and mlp params when a param group is split across GPUs.</span>
+<span class="diff-ctx">         &quot;&quot;&quot;</span>
+<span class="diff-ctx">         params_list = list(params)</span>
+<span class="diff-del">-        module_group_order = [&#x27;attn_gate&#x27;, &#x27;value_embed_gate&#x27;, &#x27;attn&#x27;, &#x27;mlp&#x27;]</span>
+<span class="diff-del">-        group_sizes = [15, 16, 16]</span>
+<span class="diff-add">+        module_group_order = [&#x27;attn&#x27;, &#x27;mlp&#x27;]</span>
+<span class="diff-add">+        group_sizes = [16, 16]  # 10 attn + 6 mlp, then 16 mlp</span>
+<span class="diff-ctx">         params_list.sort(key=lambda x: module_group_order.index(x.label))</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         idx = 0</span>
+<span class="diff-hunk">@@ -732,19 +728,40 @@ def __init__(self, params, label_order: list[str],lr: float = 1e-3, betas: tuple</span>
+<span class="diff-ctx">         # init state: small params (numel &lt; 1024) use full-sized state, others use sharded</span>
+<span class="diff-ctx">         for p in params:</span>
+<span class="diff-ctx">             chunk = p if p.numel() &lt; 1024 else p[:p.size(0) // self.world_size]</span>
+<span class="diff-del">-            exp_avg = torch.zeros_like(chunk, dtype=torch.bfloat16, device=p.device)</span>
+<span class="diff-add">+            exp_avg = torch.zeros_like(chunk, dtype=torch.float32, device=p.device)</span>
+<span class="diff-ctx">             self.state[p] = dict(step=0, exp_avg=exp_avg, exp_avg_sq=torch.zeros_like(exp_avg))</span>
+<span class="diff-ctx">         # DistributedAdam implementation by @vagrawal, @akash5474</span>
+<span class="diff-ctx">         self.should_sync = False</span>
+<span class="diff-ctx">         self._reduce_scatter_hooks = []</span>
+<span class="diff-ctx">         self._reduce_scatter_futures = {}</span>
+<span class="diff-add">+        # 0-D CPU tensors to avoid recompilation in _update_step</span>
+<span class="diff-add">+        self._step_size_t = torch.tensor(0.0, dtype=torch.float32, device=&quot;cpu&quot;)</span>
+<span class="diff-add">+        self._eff_wd_t = torch.tensor(0.0, dtype=torch.float32, device=&quot;cpu&quot;)</span>
+<span class="diff-ctx">         self.register_backward_hooks()</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     def register_backward_hooks(self):</span>
+<span class="diff-ctx">         for group in self.param_groups:</span>
+<span class="diff-ctx">             for param in group[&quot;params&quot;]:</span>
+<span class="diff-ctx">                 self._reduce_scatter_hooks.append(param.register_post_accumulate_grad_hook(self._sync_gradient))</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+    def load_state_dict(self, state_dict):</span>
+<span class="diff-add">+        &quot;&quot;&quot;Override to preserve optimizer state dtypes (avoid BFloat16-&gt;Float32 cast that causes recompilation).&quot;&quot;&quot;</span>
+<span class="diff-add">+        # Save original state dtypes before loading</span>
+<span class="diff-add">+        original_dtypes = {}</span>
+<span class="diff-add">+        for p, s in self.state.items():</span>
+<span class="diff-add">+            original_dtypes[p] = {k: v.dtype for k, v in s.items() if isinstance(v, torch.Tensor)}</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        # Call parent load_state_dict (which may cast dtypes to match param dtype)</span>
+<span class="diff-add">+        super().load_state_dict(state_dict)</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        # Restore original dtypes</span>
+<span class="diff-add">+        for p, s in self.state.items():</span>
+<span class="diff-add">+            if p in original_dtypes:</span>
+<span class="diff-add">+                for k, v in s.items():</span>
+<span class="diff-add">+                    if isinstance(v, torch.Tensor) and k in original_dtypes[p]:</span>
+<span class="diff-add">+                        if v.dtype != original_dtypes[p][k]:</span>
+<span class="diff-add">+                            s[k] = v.to(original_dtypes[p][k])</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     @torch.no_grad()</span>
+<span class="diff-ctx">     def _sync_gradient(self, param):</span>
+<span class="diff-ctx">         if not self.should_sync:</span>
+<span class="diff-hunk">@@ -777,7 +794,19 @@ def copy_lm_to_embed(self):</span>
+<span class="diff-ctx">         embed_state[&#x27;exp_avg_sq&#x27;] = lm_head_state[&#x27;exp_avg_sq&#x27;].clone()</span>
+<span class="diff-ctx">         embed.data.copy_(lm_head.data)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-    @torch.compile</span>
+<span class="diff-add">+    @staticmethod</span>
+<span class="diff-add">+    @torch.compile(dynamic=False, fullgraph=True)</span>
+<span class="diff-add">+    def _update_step(p_slice, g_slice, exp_avg, exp_avg_sq, beta1, beta2, eps, step_size_t, eff_wd_t):</span>
+<span class="diff-add">+        &quot;&quot;&quot;Compiled Adam update step. step_size_t and eff_wd_t are 0-D CPU tensors to avoid recompilation.&quot;&quot;&quot;</span>
+<span class="diff-add">+        exp_avg.mul_(beta1).add_(g_slice, alpha=1 - beta1)  # exp_avg = beta1 * exp_avg + (1 - beta1) * g_slice</span>
+<span class="diff-add">+        exp_avg_sq.mul_(beta2).addcmul_(g_slice, g_slice, value=1 - beta2)  # exp_avg_sq = beta2 * exp_avg_sq + (1 - beta2) * g_slice^2</span>
+<span class="diff-add">+        # compute step</span>
+<span class="diff-add">+        update = exp_avg.div(exp_avg_sq.sqrt().add_(eps)).mul_(step_size_t)  # update = (exp_avg / (sqrt(exp_avg_sq) + eps)) * step_size</span>
+<span class="diff-add">+        # cautious weight decay</span>
+<span class="diff-add">+        mask = (update * p_slice) &gt; 0</span>
+<span class="diff-add">+        update.addcmul_(p_slice, mask, value=eff_wd_t)  # update += eff_wd_t * p_slice * mask</span>
+<span class="diff-add">+        p_slice.add_(other=update, alpha=-1.0)  # p_slice -= update</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     @torch.no_grad()</span>
+<span class="diff-ctx">     def step(self):</span>
+<span class="diff-ctx">         rank = dist.get_rank()</span>
+<span class="diff-hunk">@@ -804,28 +833,17 @@ def step(self):</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">                 lr = group[&#x27;lr&#x27;] * getattr(param, &quot;lr_mul&quot;, 1.0)</span>
+<span class="diff-ctx">                 state = self.state[param]</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-                exp_avg = state[&quot;exp_avg&quot;]</span>
+<span class="diff-del">-                exp_avg_sq = state[&quot;exp_avg_sq&quot;]</span>
+<span class="diff-ctx">                 state[&quot;step&quot;] += 1</span>
+<span class="diff-ctx">                 t = state[&quot;step&quot;]</span>
+<span class="diff-del">-                # update running averages</span>
+<span class="diff-del">-                exp_avg.mul_(beta1).add_(g_slice, alpha=1 - beta1)</span>
+<span class="diff-del">-                exp_avg_sq.mul_(beta2).addcmul_(g_slice, g_slice, value=1 - beta2)</span>
+<span class="diff-del">-                # bias corrections</span>
+<span class="diff-del">-                bias1 = 1 - beta1 ** t</span>
+<span class="diff-del">-                bias2 = 1 - beta2 ** t</span>
+<span class="diff-del">-                # compute step</span>
+<span class="diff-del">-                denom = exp_avg_sq.sqrt().add_(eps)</span>
+<span class="diff-del">-                step_size = lr * (bias2 ** 0.5 / bias1)</span>
+<span class="diff-del">-                update = exp_avg.div(denom).mul_(step_size)</span>
+<span class="diff-del">-                # cautious weight decay</span>
+<span class="diff-del">-                mask = (update * p_slice) &gt; 0</span>
+<span class="diff-del">-                # lr as weight decay schedule</span>
+<span class="diff-del">-                eff_weight_decay = lr * wd * getattr(param, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-del">-                update.addcmul_(p_slice, mask, value=eff_weight_decay * lr)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-                p_slice.add_(other=update, alpha=-1.0)</span>
+<span class="diff-add">+                </span>
+<span class="diff-add">+                # Pre-compute changing values as 0-D CPU tensors to avoid recompilation.</span>
+<span class="diff-add">+                # `.fill_(value)` is the same as &quot;= value&quot;, but doesn&#x27;t change the tensor object.</span>
+<span class="diff-add">+                bias1, bias2 = 1 - beta1 ** t, 1 - beta2 ** t</span>
+<span class="diff-add">+                self._step_size_t.fill_(lr * (bias2 ** 0.5 / bias1))</span>
+<span class="diff-add">+                self._eff_wd_t.fill_(lr * lr * wd * getattr(param, &quot;wd_mul&quot;, 1.0)) # `lr` included twice to serve as weight decay schedule.</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                DistAdam._update_step(p_slice, g_slice, state[&quot;exp_avg&quot;], state[&quot;exp_avg_sq&quot;],</span>
+<span class="diff-add">+                                      beta1, beta2, eps, self._step_size_t, self._eff_wd_t)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">                 if not is_small:</span>
+<span class="diff-ctx">                     all_gather_futures.append(dist.all_gather_into_tensor(param, p_slice, async_op=True).get_future())</span>
+<span class="diff-hunk">@@ -919,6 +937,8 @@ class AttnArgs:</span>
+<span class="diff-ctx">     sin: torch.Tensor</span>
+<span class="diff-ctx">     attn_scale: float</span>
+<span class="diff-ctx">     key_offset: bool</span>
+<span class="diff-add">+    attn_gate_w: torch.Tensor</span>
+<span class="diff-add">+    ve_gate_w: torch.Tensor</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> flash_attn_interface = get_kernel(&#x27;varunneal/flash-attention-3&#x27;).flash_attn_interface</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -944,15 +964,6 @@ def __init__(self, dim: int, head_dim: int, num_heads: int, layer_idx: int):</span>
+<span class="diff-ctx">             self.qkvo_w[:self.dim * 3].uniform_(-bound, bound)  # init QKV weights</span>
+<span class="diff-ctx">             self.qkvo_w[self.dim * 3:].zero_()  # init O weights to zero</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        # sparse gated attention to enable context based no-op by @classiclarryd</span>
+<span class="diff-del">-        self.attn_gate = CastedLinear(12, num_heads)</span>
+<span class="diff-del">-        self.attn_gate.weight.label = &#x27;attn_gate&#x27;</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-        # only include gates on layers with value embeds used on forward pass</span>
+<span class="diff-del">-        if layer_idx in [0,1,8,9,10]:</span>
+<span class="diff-del">-            self.value_embed_gate = CastedLinear(12, num_heads)</span>
+<span class="diff-del">-            self.value_embed_gate.weight.label = &#x27;value_embed_gate&#x27;</span>
+<span class="diff-del">-</span>
+<span class="diff-ctx">     def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">         B, T = x.size(0), x.size(1) # batch size, sequence length</span>
+<span class="diff-ctx">         assert B == 1, &quot;varlen sequences requires B == 1&quot;</span>
+<span class="diff-hunk">@@ -961,6 +972,9 @@ def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">         cos, sin = attn_args.cos, attn_args.sin</span>
+<span class="diff-ctx">         ve, sa_lambdas, key_offset = attn_args.ve, attn_args.sa_lambdas, attn_args.key_offset</span>
+<span class="diff-ctx">         seqlens, attn_scale, bm_size = attn_args.seqlens, attn_args.attn_scale, attn_args.bm_size</span>
+<span class="diff-add">+        # sparse gated attention to enable context based no-op by @classiclarryd</span>
+<span class="diff-add">+        # only include gates on layers with value embeds used on forward pass</span>
+<span class="diff-add">+        attn_gate_w, ve_gate_w = attn_args.attn_gate_w, attn_args.ve_gate_w</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         q, k, v = F.linear(x, sa_lambdas[0] * self.qkvo_w[:self.dim * 3].type_as(x)).view(B, T, 3 * self.num_heads, self.head_dim).chunk(3, dim=-2)</span>
+<span class="diff-ctx">         q, k = norm(q), norm(k) # QK norm @Grad62304977</span>
+<span class="diff-hunk">@@ -970,7 +984,7 @@ def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">             k[:, 1:, :, self.head_dim // 4:self.head_dim // 2] = k[:, :-1, :, self.head_dim // 4:self.head_dim // 2]</span>
+<span class="diff-ctx">             k[:, 1:, :, 3 * self.head_dim // 4:] = k[:, :-1, :, 3 * self.head_dim // 4:]</span>
+<span class="diff-ctx">         if ve is not None:</span>
+<span class="diff-del">-            ve_gate_out = 2 * torch.sigmoid(self.value_embed_gate(x[..., :self.value_embed_gate.weight.size(-1)])).view(B, T, self.num_heads, 1)</span>
+<span class="diff-add">+            ve_gate_out = 2 * torch.sigmoid(F.linear(x[..., :12], ve_gate_w)).view(B, T, self.num_heads, 1)</span>
+<span class="diff-ctx">             v = v + ve_gate_out * ve.view_as(v) # @ KoszarskyB &amp; @Grad62304977</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         max_len = args.train_max_seq_len if self.training else (args.val_batch_size // (grad_accum_steps * world_size))</span>
+<span class="diff-hunk">@@ -980,7 +994,7 @@ def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">                                                         max_seqlen_q=max_len, max_seqlen_k=max_len,</span>
+<span class="diff-ctx">                                                         causal=True, softmax_scale=attn_scale, window_size=(bm_size, 0))</span>
+<span class="diff-ctx">         y = y.view(B, T, self.num_heads, self.head_dim)</span>
+<span class="diff-del">-        y = y * torch.sigmoid(self.attn_gate(x[..., :self.attn_gate.weight.size(-1)])).view(B, T, self.num_heads, 1)</span>
+<span class="diff-add">+        y = y * torch.sigmoid(F.linear(x[..., :12], attn_gate_w)).view(B, T, self.num_heads, 1)</span>
+<span class="diff-ctx">         y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side</span>
+<span class="diff-ctx">         y = F.linear(y, sa_lambdas[1] * self.qkvo_w[self.dim * 3:].type_as(y))  # sa_lambdas[1] pre-multiplied to O @shenberg</span>
+<span class="diff-ctx">         return y</span>
+<span class="diff-hunk">@@ -1059,6 +1073,13 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, head_dim: i</span>
+<span class="diff-ctx">             nn.init.zeros_(embed.weight)</span>
+<span class="diff-ctx">         for ve in self.value_embeds:</span>
+<span class="diff-ctx">             ve.weight.label = &#x27;value_embed&#x27;</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        # parameter banks for attention and value embedding gate weights</span>
+<span class="diff-add">+        self.attn_gate_bank = nn.Parameter(torch.zeros(10, num_heads, 12)) # 10 layers</span>
+<span class="diff-add">+        self.attn_gate_bank.label = &#x27;attn_gate_bank&#x27;</span>
+<span class="diff-add">+        self.ve_gate_bank = nn.Parameter(torch.zeros(5, num_heads, 12)) # 5 layers</span>
+<span class="diff-add">+        self.ve_gate_bank.label = &#x27;ve_gate_bank&#x27;</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         self.blocks = nn.ModuleList([Block(model_dim, head_dim, num_heads, i) for i in range(num_layers)])</span>
+<span class="diff-ctx">         self.yarn = Yarn(head_dim, max_seq_len)</span>
+<span class="diff-ctx">         # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span>
+<span class="diff-hunk">@@ -1150,6 +1171,14 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, seqlens: Tensor, schedu</span>
+<span class="diff-ctx">         x = torch.cat([x[:1], x[1:] + smear_gate_out * x[:-1]])</span>
+<span class="diff-ctx">         x = x0 = norm(x[None])</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+        # unbind gate banks to avoid select_backwards kernel</span>
+<span class="diff-add">+        ag = [w.bfloat16() for w in self.attn_gate_bank.unbind(0)] </span>
+<span class="diff-add">+        veg = [w.bfloat16() for w in self.ve_gate_bank.unbind(0)]</span>
+<span class="diff-add">+        attn_gates = ag[:6] + [None] + ag[6:]</span>
+<span class="diff-add">+        ve_gates = [veg[0], veg[1]] + [None] * (self.num_layers - 5) + [veg[2], veg[3], veg[4]]</span>
+<span class="diff-add">+        assert len(attn_gates) == self.num_layers</span>
+<span class="diff-add">+        assert len(ve_gates) == self.num_layers</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         for i in range(self.num_layers):</span>
+<span class="diff-ctx">             attn_args = AttnArgs(</span>
+<span class="diff-ctx">                 ve=ve[i],</span>
+<span class="diff-hunk">@@ -1159,7 +1188,9 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, seqlens: Tensor, schedu</span>
+<span class="diff-ctx">                 cos=self.yarn.cos,</span>
+<span class="diff-ctx">                 sin=self.yarn.sin,</span>
+<span class="diff-ctx">                 attn_scale=self.yarn.attn_scale,</span>
+<span class="diff-del">-                key_offset = key_offset[i]</span>
+<span class="diff-add">+                key_offset=key_offset[i],</span>
+<span class="diff-add">+                attn_gate_w=attn_gates[i],</span>
+<span class="diff-add">+                ve_gate_w=ve_gates[i]</span>
+<span class="diff-ctx">             )</span>
+<span class="diff-ctx">             if i in skip_out:</span>
+<span class="diff-ctx">                 skip_gate_out = torch.sigmoid(skip_lambda) * 2 * torch.sigmoid(self.skip_gate(x0[..., :self.skip_gate.weight.size(-1)]))</span>
+<span class="diff-hunk">@@ -1453,9 +1484,9 @@ def __init__(self, model):</span>
+<span class="diff-ctx">         self.mtp_weights_schedule = self._build_mtp_schedule()</span>
+<span class="diff-ctx">         self.model = model</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        adam_labels = [&#x27;lm_head&#x27;, &#x27;value_embed&#x27;, &#x27;smear_gate&#x27;, &#x27;skip_gate&#x27;, &#x27;x0_lambdas&#x27;, &#x27;embed&#x27;]</span>
+<span class="diff-add">+        adam_labels = [&#x27;lm_head&#x27;, &#x27;value_embed&#x27;, &#x27;smear_gate&#x27;, &#x27;attn_gate_bank&#x27;, &#x27;ve_gate_bank&#x27;, &#x27;skip_gate&#x27;, &#x27;x0_lambdas&#x27;, &#x27;embed&#x27;]</span>
+<span class="diff-ctx">         scalar_labels = [&#x27;scalars&#x27;]</span>
+<span class="diff-del">-        muon_labels = [&#x27;attn_gate&#x27;, &#x27;value_embed_gate&#x27;, &#x27;attn&#x27;, &#x27;mlp&#x27;]</span>
+<span class="diff-add">+        muon_labels = [&#x27;attn&#x27;, &#x27;mlp&#x27;]</span>
+<span class="diff-ctx">         adam_params = [p for p in model.parameters() if getattr(p, &#x27;label&#x27;, None) in adam_labels]</span>
+<span class="diff-ctx">         scalar_params = [p for p in model.parameters() if getattr(p, &#x27;label&#x27;, None) in scalar_labels]</span>
+<span class="diff-ctx">         muon_params = [p for p in model.parameters() if getattr(p, &#x27;label&#x27;, None) in muon_labels]</span>
+<span class="diff-hunk">@@ -1511,7 +1542,7 @@ def _is_active_step(self, opt, step: int):</span>
+<span class="diff-ctx">         return (opt.odd_step_only and step%2==1) or not opt.odd_step_only</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     def get_transition_steps(self):</span>
+<span class="diff-del">-        transition_steps = [0]</span>
+<span class="diff-add">+        transition_steps = []</span>
+<span class="diff-ctx">         ws_short, ws_long = get_ws(0)</span>
+<span class="diff-ctx">         for step in range(1, args.num_iterations):</span>
+<span class="diff-ctx">             ws_short, new_ws_long = get_ws(step)</span>
+<span class="diff-hunk">@@ -1524,6 +1555,7 @@ def advance_schedule(self, step: int):</span>
+<span class="diff-ctx">         self.ws_short, new_ws_long = get_ws(step)</span>
+<span class="diff-ctx">         if new_ws_long != self.ws_long:</span>
+<span class="diff-ctx">             self.model.yarn.apply(self.ws_long, new_ws_long)</span>
+<span class="diff-add">+            #self.start_transition() # Freeze scalar weights during transition</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         new_batch_size = get_bs(step)</span>
+<span class="diff-ctx">         if new_batch_size != self.batch_size:</span>
+<span class="diff-hunk">@@ -1571,6 +1603,8 @@ def reset(self, state=None):</span>
+<span class="diff-ctx">             for opt, opt_state in zip(self.optimizers, state):</span>
+<span class="diff-ctx">                 opt.should_sync = False</span>
+<span class="diff-ctx">                 opt.load_state_dict(opt_state)</span>
+<span class="diff-add">+                if isinstance(opt, DistAdam):</span>
+<span class="diff-add">+                    opt.freeze_timer = 0</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         # muon momentum buffers not in state dict</span>
+<span class="diff-ctx">         self.muon_opt.reset()</span>
+<span class="diff-hunk">@@ -1598,7 +1632,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx">     train_max_seq_len: int = 128 * 16</span>
+<span class="diff-ctx">     val_batch_size: int = 4 * 64 * 1024 * 8</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_scheduled_iterations: int = 1805  # number of steps to complete lr and ws schedule</span>
+<span class="diff-add">+    num_scheduled_iterations: int = 1785  # number of steps to complete lr and ws schedule</span>
+<span class="diff-ctx">     num_extension_iterations: int = 40  # number of steps to continue training at final lr and ws</span>
+<span class="diff-ctx">     num_iterations: int = num_scheduled_iterations + num_extension_iterations</span>
+<span class="diff-ctx">     cooldown_frac: float = 0.50  # fraction of num_scheduled_iterations spent cooling down the learning rate</span>
+<span class="diff-hunk">@@ -1670,6 +1704,8 @@ def nvidia_smi():</span>
+<span class="diff-ctx"> for m in model.modules():</span>
+<span class="diff-ctx">     if isinstance(m, (nn.Embedding, nn.Linear)):</span>
+<span class="diff-ctx">         m.weight.data = m.weight.data.bfloat16()</span>
+<span class="diff-add">+model.attn_gate_bank.data = model.attn_gate_bank.data.bfloat16()</span>
+<span class="diff-add">+model.ve_gate_bank.data = model.ve_gate_bank.data.bfloat16()</span>
+<span class="diff-ctx"> for param in model.parameters():</span>
+<span class="diff-ctx">     dist.broadcast(param.detach(), 0)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -1687,7 +1723,8 @@ def nvidia_smi():</span>
+<span class="diff-ctx"> val_loader = distributed_data_generator(args.val_files, args.val_batch_size, -1, grad_accum_steps=grad_accum_steps, align_to_bos=False)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> transition_steps = training_manager.get_transition_steps()</span>
+<span class="diff-del">-warmup_steps = sorted(set(s + offset for s in transition_steps for offset in [-1, 0, 1] if s + offset &gt;= 0))</span>
+<span class="diff-add">+# first few steps plus transitions</span>
+<span class="diff-add">+warmup_steps = sorted({0, 1, 2} | set(s + offset for s in transition_steps for offset in [-1, 0, 1] if s + offset &gt;= 0)) </span>
+<span class="diff-ctx"> print0(f&quot;Sampling steps {warmup_steps} for warmup&quot;, console=True)</span>
+<span class="diff-ctx"> for step in warmup_steps:</span>
+<span class="diff-ctx">     training_manager.advance_schedule(step)</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #187)</span>
+                    <span>28 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/32be977f-b49d-4ebb-8bf1-e746e6ac836c.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/380f4423-d800-4733-892f-e60b4324d41f.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/3909d342-68b1-4ba8-9b81-7737017ab39c.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/403da203-a554-460f-9e3a-96b04190af4a.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/6894ef7d-3731-46fa-8ffc-1f790943e162.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/71964006-f538-4aa6-87e3-3807cfb1f5aa.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-29-baseline/8de9ae48-dfa3-4c05-9e5d-c859b3c27cf7.txt <span class="add" style="color:var(--green)">+3699</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/219a5f2f-151e-4c56-ab91-3735ae4610b8.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/286c445e-6f70-42ba-993e-23ee9762a579.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/3ca1b5bd-f7f6-4106-8a45-8c6607c23aa0.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/907ba582-c9ff-43a2-840d-c667d1b10638.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/96a77cab-a592-4c59-87b9-9749c67ebd3d.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/a54a2033-9f11-409c-b523-985e37969f67.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/ae074dc9-fe47-417a-bc3e-6edc7f02dff8.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/b638aa36-1ab4-4565-b8de-a57034004555.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/bf4aad6c-d6b7-46e7-bd2c-32d965e3d608.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam-20stps/c9b0fce8-4059-416c-b743-738fef662d18.txt <span class="add" style="color:var(--green)">+3716</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/14f05338-c512-457c-b342-10ad5f60b9a4.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/261e0747-7ab4-48cb-bee7-fd8eacb7bd7a.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/548cbd1f-9041-455f-aa0f-319870de9ab0.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/76633a22-fa14-499a-a1ea-a2400cc22c46.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/8743e885-2b24-40c7-a44b-d7dbc5e54448.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/a8745aba-019f-4bd5-af21-d4ff3cd03a2f.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/12-31-gates-to-adam/dcc322e7-732e-456b-b9f4-262d35411e8a.txt <span class="add" style="color:var(--green)">+3736</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/README.md <span class="add" style="color:var(--green)">+134</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/adam_kernel_fusion.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/impact_to_opt_window.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2025-12-31_GatesToCompiledAdam/smoothing_plots.png <span class="add" style="color:var(--green)">+0</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>219a5f2f-151e-4c56-ab91-3735ae4610b8.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2791</td>
+                <td>113.1s</td>
+                <td>1825</td>
+                <td>61.98ms</td>
+                <td>29801 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 219a5f2f-151e-4c56-ab91-3735ae4610b8.txt</span>
+                    <span>1726 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 1726 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line"></span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read()  # read the code of this file ASAP, for logging</span><span class="line">import copy</span><span class="line">import glob</span><span class="line">import math</span><span class="line">import threading</span><span class="line">import time</span><span class="line">import uuid</span><span class="line">from dataclasses import dataclass</span><span class="line">from collections import defaultdict</span><span class="line">from itertools import accumulate</span><span class="line">from pathlib import Path</span><span class="line">import gc</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line"></span><span class="line">torch.empty(</span><span class="line">    1, device=f&quot;cuda:{os.environ[&#x27;LOCAL_RANK&#x27;]}&quot;, requires_grad=True</span><span class="line">).backward()  # prevents a bug on some systems</span><span class="line">import torch._dynamo as dynamo</span><span class="line">import torch.distributed as dist</span><span class="line">import torch.nn.functional as F</span><span class="line"></span><span class="line"># torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line">import triton</span><span class="line">import triton.language as tl</span><span class="line">from kernels import get_kernel</span><span class="line">from torch import Tensor, nn</span><span class="line"></span><span class="line">dynamo.config.recompile_limit = 64</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span><span class="line">def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8.T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[1]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w.T, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_backward&quot;, mutates_args=())</span><span class="line">def mm_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        x_inv_s = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_inv_s = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_inv_s = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_inv_s,</span><span class="line">            scale_b=w_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        # faster than grad_f8_t @ x_f8, for (d_out, d_in) == (50304, 768)</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_inv_s,</span><span class="line">            scale_b=grad_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        ).T</span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    return impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">@mm_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.T.contiguous().T.to(torch.float32)</span><span class="line"></span><span class="line">def backward(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_op.register_autograd(backward, setup_context=setup_context)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Triton kernel for symmetric matrix multiplication by @byronxu99</span><span class="line"></span><span class="line">def _get_autotune_configs():</span><span class="line">    return [</span><span class="line">        triton.Config(</span><span class="line">            {</span><span class="line">                &quot;BLOCK_SIZE_M&quot;: bm,</span><span class="line">                &quot;BLOCK_SIZE_N&quot;: bn,</span><span class="line">                &quot;BLOCK_SIZE_K&quot;: bk,</span><span class="line">                &quot;GROUP_SIZE_M&quot;: 8,</span><span class="line">                &quot;LOWER_UPPER&quot;: 1,</span><span class="line">            },</span><span class="line">            num_stages=stages,</span><span class="line">            num_warps=warps,</span><span class="line">        )</span><span class="line">        for bm in [64, 128]</span><span class="line">        for bn in [64, 128, 256]</span><span class="line">        for bk in [64, 128]</span><span class="line">        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span><span class="line">        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span><span class="line">    ]</span><span class="line"></span><span class="line">@triton.jit</span><span class="line">def _pid_to_block(</span><span class="line">    pid,</span><span class="line">    M,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">):</span><span class="line">    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span><span class="line">    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span><span class="line">    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span><span class="line"></span><span class="line">    # Map PID to a single matrix in batch</span><span class="line">    batch_idx = pid // (num_pid_m * num_pid_n)</span><span class="line">    pid = pid % (num_pid_m * num_pid_n)</span><span class="line"></span><span class="line">    # Map PID to 2D grid of blocks</span><span class="line">    pid_m = pid // num_pid_n</span><span class="line">    pid_n = pid % num_pid_n</span><span class="line">    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span><span class="line"></span><span class="line">    m_idx = pid_m * BLOCK_SIZE_M</span><span class="line">    n_idx = pid_n * BLOCK_SIZE_N</span><span class="line">    return batch_idx, m_idx, n_idx</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def XXT_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M, K,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def XXT(A: torch.Tensor, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = A @ A.T</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line">    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    XXT_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        K=K,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ba_plus_cAA_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    alpha, beta,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    # This is mostly duplicated from XXT_kernel, but also loads and adds a block of A</span><span class="line">    # Performance is slightly slower than XXT_kernel, so we use two separate kernels</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    # Load block of A to add (corresponds to the current block of C)</span><span class="line">    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span><span class="line">    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span><span class="line">    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span><span class="line"></span><span class="line">    # Apply alpha and beta</span><span class="line">    accumulator *= alpha</span><span class="line">    accumulator += a_add * beta</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ba_plus_cAA(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert M == K, &quot;Input matrix must be square&quot;</span><span class="line">    assert out.size(-2) == M</span><span class="line">    assert out.size(-1) == M</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ba_plus_cAA_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">        alpha=alpha,</span><span class="line">        beta=beta,</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line"># Computed for num_iters=5, safety_factor=2e-2, cushion=2</span><span class="line">polar_express_coeffs = [</span><span class="line">    (8.156554524902461, -22.48329292557795, 15.878769915207462),</span><span class="line">    (4.042929935166739, -2.808917465908714, 0.5000178451051316),</span><span class="line">    (3.8916678022926607, -2.772484153217685, 0.5060648178503393),</span><span class="line">    (3.285753657755655, -2.3681294933425376, 0.46449024233003106),</span><span class="line">    (2.3465413258596377, -1.7097828382687081, 0.42323551169305323)</span><span class="line">]</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span><span class="line">def polar_express(G: torch.Tensor, split_baddbmm: bool = False):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Polar Express Sign Method: https://arxiv.org/pdf/2505.16932</span><span class="line">    by Noah Amsel, David Persson, Christopher Musco, Robert M. Gower.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) * (1 + 2e-2) + 1e-6)</span><span class="line"></span><span class="line">    # Allocate buffers</span><span class="line">    X = X.contiguous()</span><span class="line">    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span><span class="line">    B = torch.empty_like(A)</span><span class="line">    C = torch.empty_like(X)</span><span class="line"></span><span class="line">    # Select batched vs unbatched</span><span class="line">    if split_baddbmm:</span><span class="line">        BX_matmul = torch.bmm if X.ndim &gt; 2 else torch.mm</span><span class="line">    else:</span><span class="line">        aX_plus_BX = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span><span class="line"></span><span class="line">    # Perform the iterations</span><span class="line">    for a, b, c in polar_express_coeffs:</span><span class="line">        XXT(X, out=A)  # A = X @ X.mT</span><span class="line">        ba_plus_cAA(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span><span class="line"></span><span class="line">        # Referencing X twice causes pytorch to make a defensive copy,</span><span class="line">        # resulting in a cudaMemcpyAsync in baddbmm.</span><span class="line">        # For large matrices (i.e., the mlp weights), it&#x27;s faster to split</span><span class="line">        # the operation into two kernels to avoid this.</span><span class="line">        if split_baddbmm:</span><span class="line">            BX_matmul(B, X, out=C)  # C = B @ X</span><span class="line">            C.add_(X, alpha=a)      # C = C + a*X  (in-place, X only read)</span><span class="line">        else:</span><span class="line">            aX_plus_BX(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span><span class="line"></span><span class="line">        X, C = C, X  # Swap references to avoid unnecessary copies</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Compiled helpers for NorMuon by @chrisjmccormick</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True)</span><span class="line">def cautious_wd_and_update_inplace(p, v, wd_tensor, lr_tensor):</span><span class="line">    &quot;&quot;&quot;Cautious weight decay + parameter update. wd_tensor and lr_tensor are 0-D CPU tensors.&quot;&quot;&quot;</span><span class="line">    mask = (v * p) &gt;= 0</span><span class="line">    wd_factor = wd_tensor.to(p.dtype)</span><span class="line">    lr_factor = lr_tensor.to(p.dtype)</span><span class="line">    p.copy_(p - (p * mask * wd_factor * lr_factor) - (v * lr_factor))</span><span class="line"></span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True)</span><span class="line">def apply_normuon_variance_reduction(v_chunk, second_momentum_buffer, beta2, red_dim):</span><span class="line">    &quot;&quot;&quot;NorMuon variance reduction. Algebraically fuses the normalization steps to minimize memory ops.&quot;&quot;&quot;</span><span class="line">    v_mean = v_chunk.float().square().mean(dim=red_dim, keepdim=True)</span><span class="line">    red_dim_size = v_chunk.size(red_dim)</span><span class="line">    v_norm_sq = v_mean.sum(dim=(-2, -1), keepdim=True).mul_(red_dim_size)</span><span class="line">    v_norm = v_norm_sq.sqrt_()</span><span class="line">    second_momentum_buffer.lerp_(v_mean.to(dtype=second_momentum_buffer.dtype), 1 - beta2)</span><span class="line">    step_size = second_momentum_buffer.clamp_min(1e-10).rsqrt_()</span><span class="line">    scaled_sq_sum = (v_mean * red_dim_size) * step_size.float().square()</span><span class="line">    v_norm_new = scaled_sq_sum.sum(dim=(-2, -1), keepdim=True).sqrt_()</span><span class="line">    final_scale = step_size * (v_norm / v_norm_new.clamp_min_(1e-10))</span><span class="line">    return v_chunk.mul_(final_scale.type_as(v_chunk))</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># NorMuon optimizer</span><span class="line"></span><span class="line">class NorMuon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Warning: This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line"></span><span class="line">    Differences from standard Muon:</span><span class="line">    - Newton-Shulz is replaced with Polar Express for the orthogonalization step</span><span class="line">    - NorMuon adds a low-rank variance estimator similar to Adafactor. https://arxiv.org/pdf/2510.05491</span><span class="line">    - small 1D parameters handled here instead of in Adam</span><span class="line">    - Cautious weight decay, a gated version of decoupled weight decay</span><span class="line">    - Custom distributed sizing:</span><span class="line">    The model stores all attn and mlp weights in the same shape, and then updates the view as</span><span class="line">    needed on the forward pass. This enables attn and mlp weights to be contained within the same</span><span class="line">    dist.reduce_scatter_tensor() call. The model architecture has been customized to enable</span><span class="line">    (n_attn_layers+n_mlp_layers*2)%8==0 for batching across 8 GPUs with zero padding on mlp and attn.</span><span class="line">    The scheduling is:</span><span class="line">        1. reduce scatter attn/mlp round 1 (10 attn params 6 mlp params)</span><span class="line">        2. reduce scatter attn/mlp round 2 (16 mlp params)</span><span class="line">        3. wait on step 1, then compute update of 1 and schedule all gather</span><span class="line">        4. wait on step 2, then compute update of 2 and schedule all gather</span><span class="line">            GPUs receive [2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 ATTN, 2 MLP, 2 MLP, 2 MLP]</span><span class="line">            GPUs that receive params of type attn reshape before computing update</span><span class="line">        5. wait for each all gather to complete and update params</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95, beta2=0.95, custom_sizing=True):</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum, beta2=beta2)</span><span class="line">        self.world_size = dist.get_world_size() if dist.is_initialized() else 1</span><span class="line">        # custom sizing requires 8 GPUs</span><span class="line">        if custom_sizing and dist.get_world_size()==8:</span><span class="line">            param_groups = self.generate_custom_param_groups(params)</span><span class="line">        else:</span><span class="line">            param_groups = self.generate_standard_param_groups(params)</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    def reset(self):</span><span class="line">        # expose a reset for clearing buffers</span><span class="line">        for group in self.param_groups:</span><span class="line">            if &quot;momentum_buffer&quot; in group:</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r57_55_12-29-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r59_57_01-04-26.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

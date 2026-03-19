@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #28 — Sparse attention gate | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #28
+        </div>
+        <div class="detail-title">#28: Sparse attention gate</div>
+        <div class="detail-time">2.812 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span>
+            <span style="color:var(--muted);margin-left:1rem">08/23/25</span>
+            <span style="color:var(--muted)">by @classiclarryd</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Sparse attention gate</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>A learned gate that can zero out attention contributions, effectively making attention sparse. Reduces compute for uninformative attention patterns.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Sparse attention</li><li>Gating mechanisms</li><li>Attention sparsity</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #117: New WR Sparse Attention Gate (-55 steps). Including WR changes of @byronxu99</span>
+                <span class="diff-stats">
+                    <span class="add">+42134</span> / <span class="del">-6</span> in 17 files
+                    — by @ClassicLarry
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p><h2>New record 08/23/25</h2>
+
+1. Included WR improvements on Triton and grad batching from https://github.com/KellerJordan/modded-nanogpt/pull/109 by @byronxu99
+2. Added a sparse attention gate on the attention output to enable a context based no-op. Found the mechanism was performant with 12 active dimensions from the residual stream. If curious, here is a related blog post from an earlier investigation into non-sparse attention gate with detailed plots: https://medium.com/@larry36d/modulating-attention-scores-cc0bcd853f06. The blog demonstrates how the attention gate reduces the need for the bos_token to function as an attention sink. This is particularly relevant in a sliding window attention context because the bos_token is not always in the context window. ROPE embeddings cause the bos_token attention sink to change based on relative distance, whereas a sparse attention gate is indifferent to distance from start of sample. Estimate of impact: 50 steps fewer, with slight increase in time per step.
+3. As a follow-on from 2: Reduced number of iterations from 1750 to 1695.
+4. Reverted the lm head scaling changes made on Feb 10th: https://github.com/KellerJordan/modded-nanogpt/commit/85a0a5201f08c4d6bb288ef348bb252d9c33e132. When tested on a single A100, reverting this change drops the L2 norm of the LM head weights from 250 down to 10. The logits need to express values roughly from -10 to 10 in order to capture the range of token probabilities. Dividing by 27.5 (x.size(-1)**0.5) was causing the weights to grow substantially to accomplish this, since the residual stream was being normed prior to the lm_head. The second moment estimate of Adam depends on the parameter scale, and the Adam learning rates were likely heavily tuned prior to the Feb 10th update. If curious, more details near end of this blog post: https://medium.com/@larry36d/exploration-log-exploring-initializing-transformers-with-bigram-distribution-70f9c8800b21. Estimate of impact: 5-10 steps. (in this case just a cleaner cut below 3.28)
+5. Chose to keep the minimum lr at 0.1. The bos_align record decreased the minimum lr to 0.05, and a later refactor, perhaps unintentionally, moved it back to 0.1. On further testing, the impact of this value on mean loss is marginal, but lower minimum lr appear to increase the variance of the final loss, making testing more challenging. Lower minimum lr may have higher variance because its committing to diving deep in the local space earlier, and is somewhat rolling the dice on if its a promising region or not. On reflection, I likely originally picked 0.05 because taking the min loss over a grid search will naturally bias to higher variance configurations, which is the opposite of what we want.
+
+
+Validated results (p=0.0059) with 14 runs:
+``<code>
+import scipy.stats
+import torch
+
+accs = [3.2774, 3.2782, 3.2796, 3.2815, 3.276 , 3.2777, 3.2784, 3.2795,
+       3.281 , 3.2802, 3.2767, 3.2772, 3.28  , 3.2786
+    ]
+times = [
+    168.627, 169.037, 169.003, 168.727, 168.647, 169.024, 168.917,
+       168.999, 168.728, 169.07 , 168.981, 168.938, 168.718, 167.122]
+
+print(&#x27;p=%.4f&#x27; % scipy.stats.ttest_1samp(accs, 3.28, alternative=&#x27;less&#x27;).pvalue)
+<h1>p=0.0059</h1>
+
+print(&#x27;acc:&#x27;,torch.std_mean(torch.tensor(accs)))
+<h1>acc: (tensor(0.0016), tensor(3.2787))</h1>
+
+print(&#x27;time:&#x27;,torch.std_mean(torch.tensor(times)))
+<h1>time: (tensor(0.4946), tensor(168.7527)) </h1>
+<h1>Running on fresh cluster gave 167.695. actively working in jupyter notebooks on same machines during these runs may be adding variance to timing</h1>
+</code>`<code>
+
+<h3>Ablations</h3>
+The following comparisons were made against this candidate WR run:
+1. <strong>96_attn_gate</strong>. Feed the attention gate with 96 dimensions of the residual stream instead of 12. This showed decrease in accuracy. Performance roughly linearly decayed from d=12 up to d=768, d=(6,24,48) were also tested for 1 run. I don&#x27;t have an explanation. Very hand wavy speculation: Masking out attention is a very sensitive operation. Perhaps if the full residual stream is attending to this task, it loses focus on the main objective of building a representation of the next token. 
+2. <strong>no_attn_gate</strong>. Apply standard attention without a gate.
+3. <strong>full_attn_gate</strong>. Feed the attention gate with all 768 dimensions instead of 12. Higher loss than no attention gate, and the highest time per step.
+4. <strong>no_bos_align</strong>. Meaningful impact on loss.
+5. <strong>no_bos_align_or_gate</strong>. Highest loss of all ablations, as the model now has no good mechanism for handling attention sinks.
+6. <strong>no_bos_token</strong>. Updating document mask to treat bos_token as an isolated document. Interestingly, this still performs decently well as long as the attention gate exists and can take on the role of attention sink.
+7. <strong>no_logit_scale</strong>. Minor impact, point 4 from implemented changes.
+
+&lt;img width=&quot;875&quot; height=&quot;591&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/8cae1cb3-ca3e-4592-982e-a54ecd356c79&quot; /&gt;
+
+
+Runtimes below. I advice caution on interpreting the run times too heavily- a model that is 0.01 loss off when its lr has decayed to 0.1 is still very far from achieving 3.28 loss.
+&lt;img width=&quot;863&quot; height=&quot;592&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/7d7d25c0-6ac8-4668-a6ce-49e41144606e&quot; /&gt;
+
+
+
+<h3>Negative and neutral test results during this process:</h3>
+
+1. <strong>Initialize embedding tokens using bigram distribution.</strong> Bigram statistics can be calculated for 100 million tokens in ~1 second or less. I tested initializing the embedding layer using </code>z = relu(log(p(y|x)/p(y))); embed = norm(rand_linear(z))`, where p(y|x) is the bigram prob of token y given x. This initialization makes it so that tokens with similar bigram statistics will have similar embeddings. If I froze the embedding layer, this initialization performed better than random initialization. However, for non frozen embeddings, the impact was not statistically significant.
+2. <strong>Weight freezing during training</strong>. Since the majority of the time on each step is spent computing the gradient, freezing a subset of weights can substantially decrease time per step. Unfortunately, all combinations tested of this failed to yield an improvement. Typical matmul ops require N FLOPS on the forward pass and 2N FLOPs on the backwards pass. The 2N is to compute the gradient with respect to the weights to update the weights, and the gradient with respect to the data to pass the gradient onwards. The torch compiler is smart enough to compute only N FLOPS on the backwards pass for leaf operations. To leverage this, I tested updating the first 3 layers to run in parallel, and then froze the embedding after a portion of training, such that 3 layers became leaf operations. The change was not kept as the performance drop outweighed the speedup.
+9. <strong>Logit shift parameter</strong>. The residual space activations for all positions are heavily aligned away (&gt;120 degrees) from the lm_head vectors of tokens that never appear in the training set. In other words, the ~400 tokens that never appear in the 50348 vocab size (including the 91 padding vocab entries) may be skewing the topology of the activations in the residual stream. Adding a simple logits += logit_shift enables the model to learn the unigram distribution directly (or even just a static variable that is -inf on padding tokens), without disrupting the residual space. Unfortunately, my implementation of this change was giving memory issues on an A100. On the H100 setup, the change dropped the loss by 0.01 but was slightly edged out by the increase in time per step. I don&#x27;t have the budget to fiddle substantially with params I can&#x27;t test on an A100. If a more compute optimized version can be found, this is an easy improvement to the loss, likely equivalent to 50+ steps.
+10. <strong>Removing torch.compile on zeropower_via_newtonschulz5()</strong>. Surprisingly, the torch compiler makes the output of newtonschulz() vary based on the batch dimension size, with a 2% change depending on the batch size. This is relevant when we are batching kqv in one op. This appears to occur because of rounding issues with bfloat16 and some internal accumulations the compiler is altering, as the percent diff drops to less then 0.1% for float32. On an A100 removing the compile gave an improvement when I was testing different batch sizes, but the change was not statistically significant on H100 w/ fp8 lm_head. Unclear exactly what is going on here, but noting that bfloat16 can lead to very unintuitive consequences.
+11. <strong>Megabatch NetwonSchulz</strong>. Inspired by @byronxu99, I tested further impacts of batching for zeropower_via_newtonschulz5(). The results were quite surprising on an A100. The run time was heavily dependent on the batch size, with larger batch sizes running up to twice as fast, based on initial testing (honestly need to sanity check this, seemed too crazy). As a result, I experimented with setting all MLP params in 1 contiguous variable and doing a single iteration of zeropower_via_newtonschulz5(), with [3,4*768,768] input to each GPU as a single pass, and [6,768,768] for Attn to each GPU as a second pass. This gave a total of only 2 iterations of zeropower_via_newtonschulz5() on each GPU per step. I was running into memory errors on the 8H100 setup, and need to get a cheaper distributed setup before I test further.
+12. <strong>0.5 init weighting for x0 stream instead of 0</strong>. At the end of training on a A100, the x0 weight for many layers is 50x higher than the x weight. Updating the weighting to 0.5 gave a statistically significant improvement on A100, but this was not replicated on the 8H100 setup with fp8 lmhead.
+13. <strong>Normalize value embedding inputs during forward pass</strong>. Seemed like a natural thing to do given norms on the input embedding and the existing lambda to scale value weights. However, this yielded worse performance, perhaps because the value embeddings need to have much high weight than the values and the lambda scaling parameter was not tuned to handle this itself.
+14. <strong>Renormalize embedding in place between each forward pass</strong>. The L2 norm of the embedding layer is climbing from 27 to 500 over the course of training, leading to a different effective learning rate depending on the stage of training. Normalizing this parameter may enable the lr to be tuned more precisely. However, I found norm() still needed to be included in the forward pass for an accurate grad calc, at which point the compute penalty for a second norm outside the forward pass became not worthwhile.
+15. <strong>Removing value entirely (only use value embedding) for first and last 3 layers</strong>. The trained weights indicate that the value embedding is dominating the calculated attention value, and I can save some matmul ops if I can drop 6 layers of value calcs. The change cost roughly 0.015 loss, which unfortunately was worth more than the speedup achieved based on the parameters used.
+16. <strong>Bigram full initialization</strong>. Similar to 1, I tested initializing the lm_head and embedding layer to approximate the bigram distribution. (Bigram could in theory cause learning to start around 5.7 loss, with potentially better generalization during training). Unfortunately, it is not analytically simple to set embed and lm_head to achieve a known bigram distribution, because of the nonlinearity of the softmax. Attempting to approximate this yielded worse performance than random initialization.
+17. <strong>Dual loss on bigram distribution</strong>. I tested having the first X iterations minimize a combination of the next token prediction loss, along with the bigram distribution for that token. Intuition was that since I can compute the bigram distribution of 100 million tokens in 1s, the bigram distribution encodes a higher density of information than a single high variance loss signal of a 500,000 token batch. However, the 50,000x50,000 bigram matrix proved too bulky for compute efficient steps.
+</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #117)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt.py</span>
+                        <span class="diff-stats"><span class="add">+13</span> <span class="del">-6</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -477,7 +477,6 @@ def step(self):</span>
+<span class="diff-ctx">         grad_slices = []</span>
+<span class="diff-ctx">         for group in self.param_groups:</span>
+<span class="diff-ctx">             params: list[Tensor] = group[&quot;params&quot;]</span>
+<span class="diff-del">-            grad = torch.empty_like(params[-1])</span>
+<span class="diff-ctx">             for base_i in range(len(params)):</span>
+<span class="diff-ctx">                 grad = params[base_i].grad</span>
+<span class="diff-ctx">                 rank_size = grad.shape[0] // world_size</span>
+<span class="diff-hunk">@@ -594,6 +593,11 @@ def __init__(self, dim: int, num_heads: int, max_seq_len: int, head_dim=128):</span>
+<span class="diff-ctx">         # inspired by learnable scalars used by @brendanh0gan https://x.com/hi_tysam/status/1879693583898591283</span>
+<span class="diff-ctx">         self.attn_scale = 0.12</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+        # sparse gated attention to enable context based no-op by @classiclarryd</span>
+<span class="diff-add">+        self.attn_gate_dim = 12</span>
+<span class="diff-add">+        self.attn_gate = CastedLinear(self.attn_gate_dim, num_heads)</span>
+<span class="diff-add">+        self.attn_gate.weight.detach().zero_()</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     def forward(self, x: Tensor, ve: Tensor | None, lambdas: Tensor, block_mask: BlockMask):</span>
+<span class="diff-ctx">         B, T = x.size(0), x.size(1) # batch size, sequence length</span>
+<span class="diff-ctx">         assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span>
+<span class="diff-hunk">@@ -604,7 +608,9 @@ def forward(self, x: Tensor, ve: Tensor | None, lambdas: Tensor, block_mask: Blo</span>
+<span class="diff-ctx">             v = lambdas[0] * v + lambdas[1] * ve.view_as(v) # @KoszarskyB &amp; @Grad62304977</span>
+<span class="diff-ctx">         else: # skip mid-layers token value embeddings by @YouJiacheng</span>
+<span class="diff-ctx">             v = lambdas[0] * v</span>
+<span class="diff-del">-        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask, scale=self.attn_scale).transpose(1, 2)</span>
+<span class="diff-add">+        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask, scale=0.12).transpose(1, 2)</span>
+<span class="diff-add">+        y = y.view(B, T, self.num_heads, self.head_dim)</span>
+<span class="diff-add">+        y = y * torch.sigmoid(self.attn_gate(x[..., :self.attn_gate_dim])).view(B, T, self.num_heads, 1)</span>
+<span class="diff-ctx">         y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side</span>
+<span class="diff-ctx">         y = F.linear(y, self.qkvo_w[3].type_as(y))</span>
+<span class="diff-ctx">         return y</span>
+<span class="diff-hunk">@@ -677,7 +683,7 @@ def __init__(self, vocab_size: int, num_layers: int, num_heads: int, model_dim:</span>
+<span class="diff-ctx">             param.lr_mul = 75.</span>
+<span class="diff-ctx">         for param in self.value_embeds.parameters():</span>
+<span class="diff-ctx">             param.lr_mul = 75.</span>
+<span class="diff-del">-        self.lm_head.weight.lr_mul = 27.5</span>
+<span class="diff-add">+        self.lm_head.weight.lr_mul = 1.0</span>
+<span class="diff-ctx">         self.scalars.lr_mul = 5.0</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     def create_blockmasks(self, input_seq: Tensor, sliding_window_num_blocks: Tensor):</span>
+<span class="diff-hunk">@@ -752,7 +758,7 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_bloc</span>
+<span class="diff-ctx">         x = norm(x)</span>
+<span class="diff-ctx">         logits = self.lm_head(x).float()</span>
+<span class="diff-ctx">         # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)</span>
+<span class="diff-del">-        logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))</span>
+<span class="diff-add">+        logits = 30 * torch.sigmoid(logits / 7.5)</span>
+<span class="diff-ctx">         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq, reduction=&quot;sum&quot; if self.training else &quot;mean&quot;)</span>
+<span class="diff-ctx">         return loss</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -824,9 +830,10 @@ class Hyperparameters:</span>
+<span class="diff-ctx">     train_seq_len = 48*1024 # FlexAttention sequence length</span>
+<span class="diff-ctx">     val_seq_len = 4*64*1024 # FlexAttention sequence length for validation</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_iterations = 1750 # number of iterations to run</span>
+<span class="diff-add">+    num_iterations = 1695 # number of iterations to run</span>
+<span class="diff-ctx">     cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate</span>
+<span class="diff-ctx">     # evaluation and logging</span>
+<span class="diff-add">+    run_id = uuid.uuid4()</span>
+<span class="diff-ctx">     val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end</span>
+<span class="diff-ctx">     save_checkpoint = False</span>
+<span class="diff-ctx"> args = Hyperparameters()</span>
+<span class="diff-hunk">@@ -850,7 +857,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx"> # begin logging</span>
+<span class="diff-ctx"> logfile = None</span>
+<span class="diff-ctx"> if master_process:</span>
+<span class="diff-del">-    run_id = uuid.uuid4()</span>
+<span class="diff-add">+    run_id = args.run_id</span>
+<span class="diff-ctx">     os.makedirs(&quot;logs&quot;, exist_ok=True)</span>
+<span class="diff-ctx">     logfile = f&quot;logs/{run_id}.txt&quot;</span>
+<span class="diff-ctx">     print(logfile)</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #117)</span>
+                    <span>16 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/071825_TritonMuon/record.txt <span class="add" style="color:var(--green)">+2848</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/020630eb-2191-4ba2-9ee4-4cdc94316943.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/21e732fb-4c4b-4db9-94bc-9fcd5d59b080.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/4518e917-cec2-4c81-9c1a-53b0644c2326.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/48b19604-5049-48c9-956c-8ddc4d0781fb.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/50524dcb-cf95-4b75-bf89-ba8ff3c5e1af.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/53ecb4ef-77ed-4af6-b776-47cd4006614b.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/6701af06-6c40-4553-bb04-f501fdd56284.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/6df384bb-9c24-46b3-826b-f7c07168c27a.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/README.md <span class="add" style="color:var(--green)">+45</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/a39b1ae8-3a2a-4952-8032-13183b157053.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/c6be54c1-12d0-45a3-83cb-41cad0868d15.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/ca042caf-b232-4a25-b28f-88e39a2009d3.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/d3e1ea3c-521c-4abd-a549-950c698d6cbf.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/e8891a98-8bf2-43cc-bac5-728aa53482ce.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/eb6d347b-fd4a-4077-a490-436c64f97ce2.txt <span class="add" style="color:var(--green)">+2802</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>020630eb-2191-4ba2-9ee4-4cdc94316943.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2772</td>
+                <td>168.9s</td>
+                <td>1695</td>
+                <td>99.67ms</td>
+                <td>34004 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 020630eb-2191-4ba2-9ee4-4cdc94316943.txt</span>
+                    <span>939 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 939 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read() # read the code of this file ASAP, for logging</span><span class="line">import uuid</span><span class="line">import time</span><span class="line">import copy</span><span class="line">import glob</span><span class="line">from dataclasses import dataclass</span><span class="line">from functools import lru_cache</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_CUDA_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line">torch.empty(1, device=&quot;cuda&quot;, requires_grad=True).backward() # prevents a bug on some systems</span><span class="line">from torch import Tensor, nn</span><span class="line">import torch.nn.functional as F</span><span class="line">import torch.distributed as dist</span><span class="line"># use of FlexAttention contributed by @KoszarskyB</span><span class="line">from torch.nn.attention.flex_attention import BlockMask, flex_attention</span><span class="line">#torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line">import triton</span><span class="line">import triton.language as tl</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class Hyperparameters:</span><span class="line">    # data</span><span class="line">    dampen_factor = 64</span><span class="line">    run_id = f&#x27;final/{uuid.uuid4()}&#x27;</span><span class="line">    train_files = &quot;data/fineweb10B/fineweb_train_*.bin&quot; # input .bin to train on</span><span class="line">    val_files = &quot;data/fineweb10B/fineweb_val_*.bin&quot; # input .bin to eval validation loss on</span><span class="line">    val_tokens = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span><span class="line">    train_seq_len = 48*1024 # FlexAttention sequence length</span><span class="line">    val_seq_len = 4*64*1024 # FlexAttention sequence length for validation</span><span class="line">    # optimization</span><span class="line">    num_iterations = 1695 # number of iterations to run</span><span class="line">    cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate</span><span class="line">    # evaluation and logging</span><span class="line">    val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end</span><span class="line">    save_checkpoint = False</span><span class="line">args = Hyperparameters()</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span><span class="line">def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8.T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[1]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w.T, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_backward&quot;, mutates_args=())</span><span class="line">def mm_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        x_inv_s = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_inv_s = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_inv_s = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_inv_s,</span><span class="line">            scale_b=w_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        # faster than grad_f8_t @ x_f8, for (d_out, d_in) == (50304, 768)</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_inv_s,</span><span class="line">            scale_b=grad_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        ).T</span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    return impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">@mm_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.T.contiguous().T.to(torch.float32)</span><span class="line"></span><span class="line">def backward(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_op.register_autograd(backward, setup_context=setup_context)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Triton kernel for symmetric matrix multiplication by @byronxu99</span><span class="line"></span><span class="line">def _get_autotune_configs():</span><span class="line">    return [</span><span class="line">        triton.Config(</span><span class="line">            {</span><span class="line">                &quot;BLOCK_SIZE_M&quot;: bm,</span><span class="line">                &quot;BLOCK_SIZE_N&quot;: bn,</span><span class="line">                &quot;BLOCK_SIZE_K&quot;: bk,</span><span class="line">                &quot;GROUP_SIZE_M&quot;: 8,</span><span class="line">                &quot;LOWER_UPPER&quot;: 1,</span><span class="line">            },</span><span class="line">            num_stages=stages,</span><span class="line">            num_warps=warps,</span><span class="line">        )</span><span class="line">        for bm in [64, 128]</span><span class="line">        for bn in [64, 128, 256]</span><span class="line">        for bk in [64, 128]</span><span class="line">        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span><span class="line">        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span><span class="line">    ]</span><span class="line"></span><span class="line">@triton.jit</span><span class="line">def _pid_to_block(</span><span class="line">    pid,</span><span class="line">    M,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">):</span><span class="line">    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span><span class="line">    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span><span class="line">    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span><span class="line"></span><span class="line">    # Map PID to a single matrix in batch</span><span class="line">    batch_idx = pid // (num_pid_m * num_pid_n)</span><span class="line">    pid = pid % (num_pid_m * num_pid_n)</span><span class="line"></span><span class="line">    # Map PID to 2D grid of blocks</span><span class="line">    pid_m = pid // num_pid_n</span><span class="line">    pid_n = pid % num_pid_n</span><span class="line">    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span><span class="line"></span><span class="line">    m_idx = pid_m * BLOCK_SIZE_M</span><span class="line">    n_idx = pid_n * BLOCK_SIZE_N</span><span class="line">    return batch_idx, m_idx, n_idx</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ns_line_1_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M, K,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ns_line_1(A: torch.Tensor, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = A @ A.T</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line">    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ns_line_1_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        K=K,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ns_line_2_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    alpha, beta,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    # This is mostly duplicated from ns_line_1_kernel, but also loads and adds a block of A</span><span class="line">    # Performance is slightly slower than ns_line_1_kernel, so we use two separate kernels</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    # Load block of A to add (corresponds to the current block of C)</span><span class="line">    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span><span class="line">    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span><span class="line">    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span><span class="line"></span><span class="line">    # Apply alpha and beta</span><span class="line">    accumulator *= alpha</span><span class="line">    accumulator += a_add * beta</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ns_line_2(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert M == K, &quot;Input matrix must be square&quot;</span><span class="line">    assert out.size(-2) == M</span><span class="line">    assert out.size(-1) == M</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ns_line_2_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">        alpha=alpha,</span><span class="line">        beta=beta,</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span><span class="line">def newton_schulz_triton(G: torch.Tensor):</span><span class="line">    a, b, c = (3.4445, -4.7750, 2.0315)</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)</span><span class="line"></span><span class="line">    # Allocate buffers</span><span class="line">    X = X.contiguous()</span><span class="line">    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span><span class="line">    B = torch.empty_like(A)</span><span class="line">    C = torch.empty_like(X)</span><span class="line"></span><span class="line">    ns_line_3 = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span><span class="line"></span><span class="line">    # Perform the NS iterations</span><span class="line">    for _ in range(5):</span><span class="line">        ns_line_1(X, out=A)  # A = X @ X.mT</span><span class="line">        ns_line_2(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span><span class="line">        ns_line_3(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span><span class="line">        X, C = C, X  # Swap references to avoid unnecessary copies</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Warning: This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95):</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum)</span><span class="line">        params = list(params)</span><span class="line">        sizes = {p.shape for p in params}</span><span class="line">        # create one buffer per unique parameter-size</span><span class="line">        param_groups = []</span><span class="line">        for size in sizes:</span><span class="line">            group_params = [p for p in params if p.shape == size]</span><span class="line">            param_groups.append(dict(params=group_params))</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def step(self):</span><span class="line">        # Efficient systems-wise implementation of step developed by @YouJiacheng,</span><span class="line">        # @KonstantinWilleke, @alexrgilbert, @adricarda, @tuttyfrutyee, @vdlad,</span><span class="line">        # @ryanyang0, and @vagrawal.</span><span class="line">        rank = dist.get_rank()</span><span class="line">        world_size = dist.get_world_size()</span><span class="line">        reduce_scatter_futures: list[torch.Future] = []</span><span class="line">        all_gather_futures: list[torch.Future] = []</span><span class="line">        for group in self.param_groups:</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            grad = torch.empty_like(params[-1])</span><span class="line">            grad_pad = [param.grad for param in params] + [torch.zeros_like(params[-1])] * world_size</span><span class="line">            for base_i in range(0, len(params), world_size):</span><span class="line">                if base_i + rank &lt; len(params):</span><span class="line">                    grad = params[base_i + rank].grad</span><span class="line">                # This gives strange dynamo warnings</span><span class="line">                reduce_scatter_futures.append(dist.reduce_scatter(grad, grad_pad[base_i:base_i + world_size], op=dist.ReduceOp.AVG, async_op=True).get_future())</span><span class="line"></span><span class="line">        idx = 0</span><span class="line">        for group in self.param_groups:</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            params_pad = params + [torch.empty_like(params[-1])] * world_size</span><span class="line">            momentum = group[&quot;momentum&quot;]</span><span class="line">            for base_i in range(0, len(params), world_size):</span><span class="line">                reduce_scatter_futures[idx].wait()</span><span class="line">                if base_i + rank &lt; len(params):</span><span class="line">                    p = params[base_i + rank]</span><span class="line">                    grad = p.grad</span><span class="line">                    eff_lr = group[&quot;lr&quot;] * max(1, p.size(-2) / p.size(-1)) ** 0.5 * getattr(p, &quot;lr_mul&quot;, 1.0)</span><span class="line">                    eff_weight_decay = group[&quot;lr&quot;] * group[&quot;weight_decay&quot;] * getattr(p, &quot;wd_mul&quot;, 1.0)</span><span class="line">                    state = self.state[p]</span><span class="line">                    if len(state) == 0:</span><span class="line">                        state[&quot;momentum_buffer&quot;] = torch.zeros_like(grad)</span><span class="line">                    momentum_buffer = state[&quot;momentum_buffer&quot;]</span><span class="line">                    p.mul_(1 - eff_weight_decay)</span><span class="line">                    momentum_buffer.lerp_(grad, 1 - momentum)</span><span class="line">                    grad = grad.lerp_(momentum_buffer, momentum)</span><span class="line">                    v = newton_schulz_triton(grad)</span><span class="line">                    p.add_(other=v, alpha=-eff_lr)</span><span class="line">                idx += 1</span><span class="line">                all_gather_futures.append(dist.all_gather(params_pad[base_i:base_i + world_size], params_pad[base_i + rank], async_op=True).get_future())</span><span class="line">        torch.futures.collect_all(all_gather_futures).wait()</span><span class="line"></span><span class="line">class DistAdam(torch.optim.Optimizer):</span><span class="line">    def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-8, weight_decay: float = 0.01):</span><span class="line">        defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)</span><span class="line">        params = list(params)</span><span class="line">        sizes = {p.shape for p in params}</span><span class="line">        # create one buffer per unique parameter-size</span><span class="line">        param_groups = []</span><span class="line">        for size in sizes:</span><span class="line">            group_params = [p for p in params if p.shape == size]</span><span class="line">            param_groups.append(dict(params=group_params))</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line">        # DistributedAdam implementation by @vagrawal</span><span class="line"></span><span class="line">    @torch.compile</span><span class="line">    @torch.no_grad()</span><span class="line">    def step(self):</span><span class="line">        rank = dist.get_rank()</span><span class="line">        world_size = dist.get_world_size()</span><span class="line">        reduce_scatter_futures: list[torch.Future] = []</span><span class="line">        all_gather_futures: list[torch.Future] = []</span><span class="line">        grad_slices = []</span><span class="line">        for group in self.param_groups:</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            grad = torch.empty_like(params[-1])</span><span class="line">            for base_i in range(len(params)):</span><span class="line">                grad = params[base_i].grad</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r29_27_07-18-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r31_29_09-03-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

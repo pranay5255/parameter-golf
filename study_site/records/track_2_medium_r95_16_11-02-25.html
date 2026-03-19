@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #16 — Smear-MTP | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 2: GPT-2 Medium → Record #16
+        </div>
+        <div class="detail-title">#16: Smear-MTP</div>
+        <div class="detail-time">22.99 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span>
+            <span style="color:var(--muted);margin-left:1rem">11/02/25</span>
+            <span style="color:var(--muted)">by @snimu</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Smear + Multi-Token Prediction for Medium track</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>Bringing the smear module and MTP from the Small track to Medium, with scale-appropriate tuning.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Smear module at scale</li><li>MTP at scale</li><li>Technique transfer</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #151: New Medium WR: Smear-MTP (-9.93 seconds)</span>
+                <span class="diff-stats">
+                    <span class="add">+6639</span> / <span class="del">-2</span> in 3 files
+                    — by @snimu
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p>Perform Multi-Token Prediction (and adaptive compute) by smearing the previous token&#x27;s output latents into the current token&#x27;s output latents like this (compared to the baseline, simplified code):
+
+``<code>python
+<h1>Baseline</h1>
+x = embed(input_sequence)
+for layer in layers:
+    x = layer(x)  # Attention + MLP, with residual
+x = rms_norm(x)
+output_distribution = softmax(language_head(x))
+
+<h1>With Smear-MTP</h1>
+x = embed(input_sequence)
+for layer in layers:
+    x = layer(x)  # Attention + MLP, with residual
+x = rms_norm(x)
+x = torch.cat(
+    [
+        x[:, :1],  # Nothing to smear into token one
+        x[:, 1:] + lambda_smear * x[:, :-1]  # Smear previous latents into current ones
+    ]
+)
+output_distribution = softmax(language_head(x))
+</code>`<code>
+
+<h2>Statistics</h2>
+
+Steps: Reduced from 5550 to 5535.
+
+Times:
+
+</code>`<code>python
+[1374.632, 1373.729, 1373.736, 1373.197, 1376.135, 1374.402, 1381.415, 1373.751, 1376.031, 1373.949, 1373.603, 1372.811, 1373.156, 1373.248, 1374.181, 1374.237, 1373.307, 1372.933, 1385.601, 1374.115, 1372.798, 1374.607, 1376.245, 1373.705, 1372.919, 1373.565]
+</code>`<code>
+
+Time Stats:
+
+<ul><li>N: 26</li>
+<li>Mean: 1374.6926 seconds (~22.91 minutes)</li>
+<li>Std: 2.83 seconds</li></ul>
+
+The previous record ran in 1384.6224 seconds (~23.08 minutes) &amp;rarr; 9.9298 seconds reduction in wallclock time.
+
+Losses:
+
+</code>`<code>python
+[2.921089, 2.918772, 2.919393, 2.920201, 2.919555, 2.918825, 2.91906, 2.918602, 2.919583, 2.920038, 2.91947, 2.918655, 2.919565, 2.919967, 2.919333, 2.919548, 2.919505, 2.918065, 2.91992, 2.919905, 2.918552, 2.919111, 2.918989, 2.919336, 2.91804, 2.91896]
+</code>``
+
+Loss Stats:
+
+<ul><li>N: 26</li>
+<li>Mean: 2.9193</li>
+<li>Std: 0.000678</li>
+<li>p-value: 1.1266e-05</li></ul>
+
+&amp;rarr; Reached loss of &lt;2.92 with confidence &gt;&gt; 99%.
+
+<h2>Re-comparing to baseline</h2>
+
+I ran initial tests to make sure that the record doesn&#x27;t come from PyTorch updates or something like that. Here are the results over time:
+
+&lt;img width=&quot;2432&quot; height=&quot;1376&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/52dbf4d7-d69b-4d80-b6cb-7f73c6b01362&quot; /&gt;
+
+The record seems to be legitimate. It&#x27;s strange that the record run took less time than the baseline; despite being very efficient (adds a single parameter and a sum + concat), it shouldn&#x27;t be faster than the baseline, so this is random variation. To double-check, here are the losses over the training steps:
+
+&lt;img width=&quot;2432&quot; height=&quot;1376&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/cac4e6cd-f24c-4af7-93be-d053c2f0ed21&quot; /&gt;
+
+This still supports the record.
+
+I also used the <a href="https://github.com/KellerJordan/modded-nanogpt/tree/master/records/track_1_short/2024-10-20_ScaleUp1B" target="_blank">old scaled-up run</a>, which is a very simple transformer with ~1B parameters trained for ~10B token, re-ran it, and ran the same thing again with Smear-MTP. The results also support the validity of the record:
+
+&lt;img width=&quot;2432&quot; height=&quot;1376&quot; alt=&quot;image&quot; src=&quot;https://github.com/user-attachments/assets/7747b153-a1c7-4580-9781-31cee59e806a&quot; /&gt;
+</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #151)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt_medium.py</span>
+                        <span class="diff-stats"><span class="add">+12</span> <span class="del">-2</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -163,6 +163,9 @@ def update(</span>
+<span class="diff-ctx">     update_smoothing_buffer.copy_(update_smoothing * update_smoothing_buffer + (1 - update_smoothing) * v)</span>
+<span class="diff-ctx">     v = update_smoothing_buffer</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+    update_smoothing_buffer.copy_(update_smoothing * update_smoothing_buffer + (1 - update_smoothing) * v)</span>
+<span class="diff-add">+    v = update_smoothing_buffer</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     acc_m_u32 = (acc_bf16_view_u16.to(torch.uint32) &lt;&lt; 16) | mantissa.to(torch.uint32)</span>
+<span class="diff-ctx">     acc_m_u32.view(torch.float32).mul_(1 - eff_weight_decay)</span>
+<span class="diff-ctx">     acc_m_u32.view(torch.float32).add_(other=v, alpha=-eff_lr)</span>
+<span class="diff-hunk">@@ -426,7 +429,8 @@ def __init__(</span>
+<span class="diff-ctx">                     *[</span>
+<span class="diff-ctx">                         torch.tensor([0.5, 0.5]) for _ in range(num_layers)</span>
+<span class="diff-ctx">                     ],  # SA lambdas</span>
+<span class="diff-del">-                    torch.tensor([1.0, 0.0]),  # skip-to-head lambdas</span>
+<span class="diff-add">+                    torch.zeros(1),  # Smear-MTP lambda</span>
+<span class="diff-add">+                    torch.tensor([1.0, 0.0]),  # backout lambdas</span>
+<span class="diff-ctx">                 ]</span>
+<span class="diff-ctx">             )</span>
+<span class="diff-ctx">         )</span>
+<span class="diff-hunk">@@ -552,6 +556,12 @@ def forward(</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         skip_lambdas = self.scalars[-2:]</span>
+<span class="diff-ctx">         x = norm(x) * skip_lambdas[0] + norm(skip_connections[11]) * skip_lambdas[1]</span>
+<span class="diff-add">+        # Smear-MTP by snimu</span>
+<span class="diff-add">+        x = torch.cat(</span>
+<span class="diff-add">+            [x[:, :1], x[:, 1:] + self.scalars[-3] * x[:, :-1]],</span>
+<span class="diff-add">+            dim=1,</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         if self.training:</span>
+<span class="diff-ctx">             logits: Tensor = F.linear(</span>
+<span class="diff-ctx">                 x.flatten(end_dim=1), self.lm_head_w.bfloat16()</span>
+<span class="diff-hunk">@@ -636,7 +646,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx">     train_seq_len = 64 * 1024  # FlexAttention sequence length</span>
+<span class="diff-ctx">     val_seq_len = 4 * 64 * 1024  # FlexAttention sequence length for validation</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_iterations = 5550  # number of iterations to run</span>
+<span class="diff-add">+    num_iterations = 5535  # number of iterations to run</span>
+<span class="diff-ctx">     cooldown_frac = 0.7  # fraction of training spent cooling down the learning rate</span>
+<span class="diff-ctx">     final_lr_scale = 0.01</span>
+<span class="diff-ctx">     # architecture</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #151)</span>
+                    <span>2 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/track_2_medium/2025-11-02-Smear-MTP/000_3b50518d-d542-44bc-8566-3abf633f83ad.txt <span class="add" style="color:var(--green)">+6595</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_2_medium/2025-11-02-Smear-MTP/README.md <span class="add" style="color:var(--green)">+32</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>000_3b50518d-d542-44bc-8566-3abf633f83ad <span style="color:var(--green)">[has code]</span></td>
+                <td>2.9193</td>
+                <td>1372.9s</td>
+                <td>5535</td>
+                <td>248.03ms</td>
+                <td>56810 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 000_3b50518d-d542-44bc-8566-3abf633f83ad.txt</span>
+                    <span>825 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 825 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line"></span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read()  # read the code of this file ASAP, for logging</span><span class="line">import copy</span><span class="line">import time</span><span class="line">import uuid</span><span class="line">from dataclasses import dataclass</span><span class="line">from functools import lru_cache</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line"></span><span class="line">torch.empty(</span><span class="line">    1, device=&quot;cuda&quot;, requires_grad=True</span><span class="line">).backward()  # prevents a bug on some systems</span><span class="line">import torch.distributed as dist</span><span class="line">import torch.nn.functional as F</span><span class="line">from torch import nn, Tensor</span><span class="line"></span><span class="line"># use of FlexAttention contributed by @KoszarskyB</span><span class="line">from torch.nn.attention.flex_attention import BlockMask, flex_attention</span><span class="line"></span><span class="line"></span><span class="line">torch._inductor.config.coordinate_descent_tuning = (</span><span class="line">    True  # we allow this flag for medium track</span><span class="line">)</span><span class="line"># torch._dynamo.config.compiled_autograd = True</span><span class="line"></span><span class="line"></span><span class="line">class Snoo:</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    @DominikKallusky, @vishal9-team, @vinaysrao</span><span class="line"></span><span class="line">    Sparse Nesterov Outer Optimizer (Snoo) is a momentum-based wrapper to any optimizer that can</span><span class="line">    improve the stability and smoothness of the optimization process and thus the quality</span><span class="line">    of large language models (LLM) and other models. Snoo implicitly adds temporal regularization</span><span class="line">    to the parameters, thus smoothing the training trajectory and instilling a bias towards flatter</span><span class="line">    minima and lower parameter norms. Snoo is computationally efficient, incurring minimal overhead</span><span class="line">    in compute and moderate memory usage.</span><span class="line">    &quot;&quot;&quot;</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def __init__(self, model: nn.Module, lr: float, momentum: float, k: int) -&gt; None:</span><span class="line">        self.model = model</span><span class="line">        self.lr = lr</span><span class="line">        self.momentum = momentum</span><span class="line">        self.k = k</span><span class="line">        self.current_step = 0</span><span class="line">        self.outer_buf = [p.clone() for p in model.parameters()]</span><span class="line">        self.model_params = list(self.model.parameters())</span><span class="line">        self.optimizer = torch.optim.SGD(</span><span class="line">            self.model.parameters(),</span><span class="line">            lr=lr,</span><span class="line">            momentum=momentum,</span><span class="line">            nesterov=True,</span><span class="line">            fused=True,</span><span class="line">        )</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def step(</span><span class="line">        self,</span><span class="line">    ) -&gt; None:</span><span class="line">        if self.current_step % self.k == 0:</span><span class="line">            for p_new, p_old in zip(self.model_params, self.outer_buf):</span><span class="line">                p_new.grad = p_old.data - p_new.data</span><span class="line">                p_new.copy_(p_old, non_blocking=True)</span><span class="line"></span><span class="line">            self.optimizer.step()</span><span class="line"></span><span class="line">            for p_new, p_old in zip(self.model_params, self.outer_buf):</span><span class="line">                p_old.copy_(p_new, non_blocking=True)</span><span class="line">        self.current_step += 1</span><span class="line"></span><span class="line">    def state_dict(self):</span><span class="line">        state_dict = {</span><span class="line">            &quot;current_step&quot;: self.current_step,</span><span class="line">            &quot;lr&quot;: self.lr,</span><span class="line">            &quot;momentum&quot;: self.momentum,</span><span class="line">            &quot;k&quot;: self.k,</span><span class="line">            &quot;outer_buf&quot;: [p.clone() for p in self.outer_buf],</span><span class="line">            &quot;optimizer_state_dict&quot;: self.optimizer.state_dict(),</span><span class="line">        }</span><span class="line">        return state_dict</span><span class="line"></span><span class="line">    def load_state_dict(self, state_dict):</span><span class="line">        self.current_step = state_dict[&quot;current_step&quot;]</span><span class="line">        self.lr = state_dict[&quot;lr&quot;]</span><span class="line">        self.momentum = state_dict[&quot;momentum&quot;]</span><span class="line">        self.k = state_dict[&quot;k&quot;]</span><span class="line">        for p_src, p_dst in zip(state_dict[&quot;outer_buf&quot;], self.outer_buf):</span><span class="line">            p_dst.copy_(p_src)</span><span class="line">        self.optimizer.load_state_dict(state_dict[&quot;optimizer_state_dict&quot;])</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line"></span><span class="line">def zeropower_via_newtonschulz5(G: Tensor) -&gt; Tensor:</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a</span><span class="line">    quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose</span><span class="line">    of minimizing steps, it turns out to be empirically effective to keep increasing the slope at</span><span class="line">    zero even beyond the point where the iteration no longer converges all the way to one everywhere</span><span class="line">    on the interval. This iteration therefore does not produce UV^T but rather something like US&#x27;V^T</span><span class="line">    where S&#x27; is diagonal with S_{ii}&#x27; ∈ [1 - l, 1 + r], which turns out not to hurt model</span><span class="line">    performance at all relative to UV^T, where USV^T = G is the SVD.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert (</span><span class="line">        G.ndim &gt;= 2</span><span class="line">    )  # batched Muon implementation by @scottjmaddox, and put into practice in the record by @YouJiacheng</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)</span><span class="line">    # Perform the NS iterations</span><span class="line">    for a, b, c in [</span><span class="line">        (4.0848, -6.8946, 2.9270),</span><span class="line">        (3.9505, -6.3029, 2.6377),</span><span class="line">        (3.7418, -5.5913, 2.3037),</span><span class="line">        (2.8769, -3.1427, 1.2046),</span><span class="line">        (2.8366, -3.0525, 1.2012),</span><span class="line">    ]:</span><span class="line">        A = X @ X.mT</span><span class="line">        B = (</span><span class="line">            b * A + c * A @ A</span><span class="line">        )  # quintic computation strategy adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng</span><span class="line">        X = a * X + B @ X</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"></span><span class="line">@torch.compile</span><span class="line">def update(</span><span class="line">    acc_bf16_view_u16: Tensor,</span><span class="line">    mantissa: Tensor,</span><span class="line">    momentum_buffer: Tensor,</span><span class="line">    update_smoothing_buffer: Tensor,</span><span class="line">    grad: Tensor,</span><span class="line">    momentum: Tensor,</span><span class="line">    update_smoothing: Tensor,</span><span class="line">    eff_lr: Tensor,</span><span class="line">    eff_weight_decay: Tensor,</span><span class="line">):</span><span class="line">    assert acc_bf16_view_u16.dtype == mantissa.dtype == torch.uint16</span><span class="line">    grad = grad.float()</span><span class="line">    momentum_buffer.copy_(momentum * momentum_buffer + (1 - momentum) * grad)</span><span class="line">    v = zeropower_via_newtonschulz5(momentum * momentum_buffer + (1 - momentum) * grad)</span><span class="line"></span><span class="line">    update_smoothing_buffer.copy_(update_smoothing * update_smoothing_buffer + (1 - update_smoothing) * v)</span><span class="line">    v = update_smoothing_buffer</span><span class="line"></span><span class="line">    acc_m_u32 = (acc_bf16_view_u16.to(torch.uint32) &lt;&lt; 16) | mantissa.to(torch.uint32)</span><span class="line">    acc_m_u32.view(torch.float32).mul_(1 - eff_weight_decay)</span><span class="line">    acc_m_u32.view(torch.float32).add_(other=v, alpha=-eff_lr)</span><span class="line">    acc_bf16_view_u16.copy_((acc_m_u32 &gt;&gt; 16).to(torch.uint16))</span><span class="line">    mantissa.copy_(acc_m_u32.to(torch.uint16))</span><span class="line"></span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Warning: This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    &quot;&quot;&quot;</span><span class="line"></span><span class="line">    def __init__(</span><span class="line">        self, params, lr=0.02, weight_decay=0.01, momentum=0.95, update_smoothing=0.0, rank=0, world_size=1</span><span class="line">    ):</span><span class="line">        self.rank = rank</span><span class="line">        self.world_size = world_size</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum, update_smoothing=update_smoothing)</span><span class="line">        super().__init__(params, defaults)</span><span class="line">        assert all(</span><span class="line">            p.dtype == torch.bfloat16</span><span class="line">            for group in self.param_groups</span><span class="line">            for p in group[&quot;params&quot;]</span><span class="line">        )</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def step(self):</span><span class="line">        futures: list[torch.Future] = []</span><span class="line">        for group in self.param_groups:</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            params_pad = params + [torch.empty_like(params[-1])] * self.world_size</span><span class="line">            momentum = torch._as_tensor_fullprec(group[&quot;momentum&quot;])</span><span class="line">            update_smoothing = torch._as_tensor_fullprec(group[&quot;update_smoothing&quot;])</span><span class="line">            for base_i in range(len(params))[:: self.world_size]:</span><span class="line">                if base_i + self.rank &lt; len(params):</span><span class="line">                    p = params[base_i + self.rank]</span><span class="line">                    state = self.state[p]</span><span class="line">                    if len(state) == 0:</span><span class="line">                        state[&quot;mantissa&quot;] = torch.zeros_like(p, dtype=torch.uint16)</span><span class="line">                        state[&quot;momentum_buffer&quot;] = torch.zeros_like(</span><span class="line">                            p, dtype=torch.float32</span><span class="line">                        )</span><span class="line">                        state[&quot;update_smoothing_buffer&quot;] = torch.zeros_like(</span><span class="line">                            p, dtype=torch.bfloat16</span><span class="line">                        )</span><span class="line">                    update(</span><span class="line">                        p.view(torch.uint16),</span><span class="line">                        state[&quot;mantissa&quot;],</span><span class="line">                        state[&quot;momentum_buffer&quot;],</span><span class="line">                        state[&quot;update_smoothing_buffer&quot;],</span><span class="line">                        p.grad,</span><span class="line">                        momentum,</span><span class="line">                        update_smoothing,</span><span class="line">                        eff_lr=torch._as_tensor_fullprec(</span><span class="line">                            group[&quot;lr&quot;] * max(1, p.size(-2) / p.size(-1)) ** 0.5</span><span class="line">                        ),</span><span class="line">                        eff_weight_decay=torch._as_tensor_fullprec(</span><span class="line">                            group[&quot;lr&quot;]</span><span class="line">                            * group[&quot;weight_decay&quot;]</span><span class="line">                            * getattr(p, &quot;wd_mul&quot;, 1.0)</span><span class="line">                        ),</span><span class="line">                    )</span><span class="line">                futures.append(</span><span class="line">                    dist.all_gather(</span><span class="line">                        params_pad[base_i : base_i + self.world_size],</span><span class="line">                        params_pad[base_i + self.rank],</span><span class="line">                        async_op=True,</span><span class="line">                    ).get_future()</span><span class="line">                )</span><span class="line">        torch.futures.collect_all(futures).wait()</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># PyTorch nn.Module definitions for the model</span><span class="line"></span><span class="line"></span><span class="line">def norm(x: Tensor):</span><span class="line">    return F.rms_norm(x, (x.size(-1),))</span><span class="line"></span><span class="line"></span><span class="line">@torch.no_grad()</span><span class="line">def init_linear(w: Tensor):</span><span class="line">    std = 0.5 * (w.size(-1) ** -0.5)  # 0.5 is a bit better than the default 1/sqrt(3)</span><span class="line">    bound = (3**0.5) * std</span><span class="line">    return w.uniform_(-bound, bound)</span><span class="line"></span><span class="line"></span><span class="line">class Rotary(nn.Module):</span><span class="line">    def __init__(self, dim: int, max_seq_len: int):</span><span class="line">        super().__init__()</span><span class="line">        # half-truncate RoPE by @YouJiacheng (w/ base freq tuning)</span><span class="line">        angular_freq = (1 / 1024) ** torch.linspace(</span><span class="line">            0, 1, steps=dim // 4, dtype=torch.float32</span><span class="line">        )</span><span class="line">        angular_freq = torch.cat([angular_freq, angular_freq.new_zeros(dim // 4)])</span><span class="line">        t = torch.arange(max_seq_len, dtype=torch.float32)</span><span class="line">        theta = torch.einsum(&quot;i,j -&gt; ij&quot;, t, angular_freq)</span><span class="line">        self.cos = nn.Buffer(theta.cos(), persistent=False)</span><span class="line">        self.sin = nn.Buffer(theta.sin(), persistent=False)</span><span class="line"></span><span class="line">    def forward(self, x_BTHD: Tensor):</span><span class="line">        assert self.cos.size(0) &gt;= x_BTHD.size(-3)</span><span class="line">        cos, sin = (</span><span class="line">            self.cos[None, : x_BTHD.size(-3), None, :],</span><span class="line">            self.sin[None, : x_BTHD.size(-3), None, :],</span><span class="line">        )</span><span class="line">        x1, x2 = x_BTHD.to(dtype=torch.float32).chunk(2, dim=-1)</span><span class="line">        y1 = x1 * cos + x2 * sin</span><span class="line">        y2 = x1 * (-sin) + x2 * cos</span><span class="line">        return torch.cat((y1, y2), 3).type_as(x_BTHD)</span><span class="line"></span><span class="line"></span><span class="line">class CausalSelfAttention(nn.Module):</span><span class="line">    def __init__(self, dim: int, num_heads: int, max_seq_len: int, head_dim=128):</span><span class="line">        super().__init__()</span><span class="line">        self.num_heads = num_heads</span><span class="line">        self.head_dim = head_dim</span><span class="line">        hdim = num_heads * head_dim</span><span class="line">        # merged QKV weights: suggested by many, implemented by @fernbear.bsky.social, and further improved by @YouJiacheng</span><span class="line">        # https://x.com/hi_tysam/status/1879699187107033311</span><span class="line">        self.qkvo_w = nn.Parameter(init_linear(torch.empty(4, hdim, dim)).bfloat16())</span><span class="line">        self.qkvo_w.detach()[3].zero_()  # out zero init suggested by @Grad62304977</span><span class="line">        self.rotary = Rotary(head_dim, max_seq_len)</span><span class="line">        # scale the attention logits by given constant, instead of the default head_dim**-0.5, by @leloykun</span><span class="line">        # inspired by learnable scalars used by @brendanh0gan https://x.com/hi_tysam/status/1879693583898591283</span><span class="line">        self.attn_scale = 0.12</span><span class="line"></span><span class="line">    def forward(</span><span class="line">        self, x: Tensor, ve: Tensor | None, block_mask: BlockMask, lambdas: Tensor</span><span class="line">    ):</span><span class="line">        B, T = x.size(0), x.size(1)  # batch size, sequence length</span><span class="line">        assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span><span class="line">        q, k, v = (</span><span class="line">            F.linear(x, self.qkvo_w[:3].flatten(end_dim=1))</span><span class="line">            .view(B, T, 3 * self.num_heads, self.head_dim)</span><span class="line">            .chunk(3, dim=-2)</span><span class="line">        )</span><span class="line">        q, k = norm(q), norm(k)  # QK norm @Grad62304977</span><span class="line">        q, k = self.rotary(q), self.rotary(k)</span><span class="line">        v = norm(v)</span><span class="line">        if ve is not None:</span><span class="line">            v = lambdas[0] * v + lambdas[1] * ve.view_as(</span><span class="line">                v</span><span class="line">            )  # @KoszarskyB &amp; @Grad62304977</span><span class="line">        else:  # skip mid-layers token value embeddings by @YouJiacheng</span><span class="line">            v = lambdas[0] * v</span><span class="line">        y = flex_attention(</span><span class="line">            q.transpose(1, 2),</span><span class="line">            k.transpose(1, 2),</span><span class="line">            v.transpose(1, 2),</span><span class="line">            block_mask=block_mask,</span><span class="line">            scale=self.attn_scale,</span><span class="line">        ).transpose(1, 2)</span><span class="line">        y = y.contiguous().view(</span><span class="line">            B, T, self.num_heads * self.head_dim</span><span class="line">        )  # re-assemble all head outputs side by side</span><span class="line">        y = F.linear(y, self.qkvo_w[3])</span><span class="line">        return y</span><span class="line"></span><span class="line"></span><span class="line">class MLP(nn.Module):</span><span class="line">    def __init__(self, dim: int):</span><span class="line">        super().__init__()</span><span class="line">        hdim = 4 * dim</span><span class="line">        self.fc_w = nn.Parameter(init_linear(torch.empty(hdim, dim)).bfloat16())</span><span class="line">        self.proj_w = nn.Parameter(torch.zeros(dim, hdim).bfloat16())</span><span class="line">        self.fc_w.wd_mul = 2.0</span><span class="line">        self.proj_w.wd_mul = 2.0</span><span class="line"></span><span class="line">    def forward(self, x: Tensor):</span><span class="line">        x = F.linear(x, self.fc_w)</span><span class="line">        x = F.relu(</span><span class="line">            x</span><span class="line">        ).square()  # https://arxiv.org/abs/2109.08668v2; ~1-2% better than GELU; suggested by @SKYLINEZ007 and @Grad62304977</span><span class="line">        x = F.linear(x, self.proj_w)</span><span class="line">        return x</span><span class="line"></span><span class="line"></span><span class="line">class Block(nn.Module):</span><span class="line">    def __init__(self, dim: int, num_heads: int, max_seq_len: int, layer_idx: int):</span><span class="line">        super().__init__()</span><span class="line">        # skip attention of blocks.7 (the 8th layer) by @YouJiacheng</span><span class="line">        self.attn = (</span><span class="line">            CausalSelfAttention(dim, num_heads, max_seq_len) if layer_idx != 7 else None</span><span class="line">        )</span><span class="line">        self.mlp = MLP(dim)</span><span class="line"></span><span class="line">    def forward(</span><span class="line">        self,</span><span class="line">        x: Tensor,</span><span class="line">        ve: Tensor | None,</span><span class="line">        x00: Tensor,</span><span class="line">        x01: Tensor,</span><span class="line">        block_mask: BlockMask,</span><span class="line">        lambdas: Tensor,</span><span class="line">        sa_lambdas: Tensor,</span><span class="line">    ):</span><span class="line">        x = lambdas[0] * x + lambdas[1] * x00 + lambdas[2] * x01</span><span class="line">        if self.attn is not None:</span><span class="line">            x = x + self.attn(x, ve, block_mask, sa_lambdas)</span><span class="line">        x = x + self.mlp(norm(x))</span><span class="line">        return x</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># The main model</span><span class="line"></span><span class="line"></span><span class="line">def next_multiple_of_n(v: float | int, *, n: int):</span><span class="line">    return next(x for x in range(n, int(v) + 1 + n, n) if x &gt;= v)</span><span class="line"></span><span class="line"></span><span class="line">class GPT(nn.Module):</span><span class="line">    def __init__(</span><span class="line">        self,</span><span class="line">        vocab_size: int,</span><span class="line">        num_layers: int,</span><span class="line">        num_heads: int,</span><span class="line">        model_dim: int,</span><span class="line">        max_seq_len: int,</span><span class="line">    ):</span><span class="line">        super().__init__()</span><span class="line">        self.embed1 = nn.Embedding(vocab_size, model_dim)</span><span class="line">        self.embed2 = nn.Embedding(vocab_size, model_dim)</span><span class="line">        # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual implementation following https://arxiv.org/abs/2410.17897</span><span class="line">        # value embedding code simplification inspired by @ragulpr https://github.com/KellerJordan/modded-nanogpt/pull/78</span><span class="line">        self.value_embeds = nn.ModuleList(</span><span class="line">            [nn.Embedding(vocab_size, model_dim) for _ in range(5)]</span><span class="line">        )</span><span class="line">        self.blocks = nn.ModuleList(</span><span class="line">            [Block(model_dim, num_heads, max_seq_len, i) for i in range(num_layers)]</span><span class="line">        )</span><span class="line">        # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span><span class="line">        # suggested to me by @Grad62304977. this originates from Karpathy&#x27;s experiments.</span><span class="line">        self.lm_head_w = nn.Parameter(</span><span class="line">            torch.zeros(next_multiple_of_n(vocab_size, n=128), model_dim)</span><span class="line">        )</span><span class="line">        # Add learnable skip connection weights for decoder layers</span><span class="line">        assert num_layers % 2 == 0</span><span class="line">        self.scalars = nn.Parameter(</span><span class="line">            torch.cat(</span><span class="line">                [</span><span class="line">                    torch.ones(num_layers),  # skip_weights</span><span class="line">                    *[</span><span class="line">                        torch.tensor([1.0, 0.0, 0.0]) for _ in range(num_layers)</span><span class="line">                    ],  # block lambdas</span><span class="line">                    *[</span><span class="line">                        torch.tensor([0.5, 0.5]) for _ in range(num_layers)</span><span class="line">                    ],  # SA lambdas</span><span class="line">                    torch.zeros(1),  # Smear-MTP lambda</span><span class="line">                    torch.tensor([1.0, 0.0]),  # backout lambdas</span><span class="line">                ]</span><span class="line">            )</span><span class="line">        )</span><span class="line">        for m in self.modules():</span><span class="line">            if isinstance(m, nn.Embedding):</span><span class="line">                m.bfloat16()</span><span class="line"></span><span class="line">    def create_blockmasks(self, input_seq: Tensor, sliding_window_num_blocks: Tensor):</span><span class="line">        BLOCK_SIZE = 128</span><span class="line">        docs = (input_seq == 50256).cumsum(0)</span><span class="line"></span><span class="line">        def document_causal(b, h, q_idx, kv_idx):</span><span class="line">            causal_mask = q_idx &gt;= kv_idx</span><span class="line">            document_mask = docs[q_idx] == docs[kv_idx]</span><span class="line">            return causal_mask &amp; document_mask</span><span class="line"></span><span class="line">        def dense_to_ordered(dense_blockmask: Tensor):</span><span class="line">            num_blocks = dense_blockmask.sum(dim=-1, dtype=torch.int32)</span><span class="line">            indices = (</span><span class="line">                dense_blockmask.argsort(dim=-1, descending=False, stable=True)</span><span class="line">                .flip(-1)</span><span class="line">                .to(torch.int32)</span><span class="line">            )</span><span class="line">            return num_blocks[None, None].contiguous(), indices[None, None].contiguous()</span><span class="line"></span><span class="line">        # manual block mask creation by @YouJiacheng</span><span class="line">        assert len(input_seq) % BLOCK_SIZE == 0</span><span class="line">        NUM_BLOCKS = len(input_seq) // BLOCK_SIZE</span><span class="line">        block_idx = torch.arange(NUM_BLOCKS, dtype=torch.int32, device=&quot;cuda&quot;)</span><span class="line">        causal_blockmask_any = block_idx[:, None] &gt;= block_idx</span><span class="line">        causal_blockmask_all = block_idx[:, None] &gt; block_idx</span><span class="line">        docs_low = docs.view(-1, BLOCK_SIZE)[:, 0].contiguous()</span><span class="line">        docs_high = docs.view(-1, BLOCK_SIZE)[:, -1].contiguous()</span><span class="line">        document_blockmask_any = (docs_low[:, None] &lt;= docs_high) &amp; (</span><span class="line">            docs_high[:, None] &gt;= docs_low</span><span class="line">        )</span><span class="line">        document_blockmask_all = (docs_low[:, None] == docs_high) &amp; (</span><span class="line">            docs_high[:, None] == docs_low</span><span class="line">        )</span><span class="line">        blockmask_any = causal_blockmask_any &amp; document_blockmask_any</span><span class="line">        blockmask_all = causal_blockmask_all &amp; document_blockmask_all</span><span class="line">        partial_kv_num_blocks, partial_kv_indices = dense_to_ordered(</span><span class="line">            blockmask_any &amp; ~blockmask_all</span><span class="line">        )</span><span class="line">        full_kv_num_blocks, full_kv_indices = dense_to_ordered(blockmask_all)</span><span class="line"></span><span class="line">        def build_bm(window_size_blocks: Tensor) -&gt; BlockMask:</span><span class="line">            return BlockMask.from_kv_blocks(</span><span class="line">                torch.clamp_max(</span><span class="line">                    partial_kv_num_blocks,</span><span class="line">                    torch.clamp_min(window_size_blocks - full_kv_num_blocks, 1),</span><span class="line">                ),</span><span class="line">                partial_kv_indices,</span><span class="line">                torch.clamp_max(full_kv_num_blocks, window_size_blocks - 1),</span><span class="line">                full_kv_indices,</span><span class="line">                BLOCK_SIZE=BLOCK_SIZE,</span><span class="line">                mask_mod=document_causal,</span><span class="line">            )</span><span class="line"></span><span class="line">        # Long-short SWA block masks by @leloykun &amp; @YouJiacheng, adapated from suggestion by @Grad62304977, following Gemma 2 paper</span><span class="line">        return build_bm(sliding_window_num_blocks), build_bm(</span><span class="line">            sliding_window_num_blocks // 2</span><span class="line">        )</span><span class="line"></span><span class="line">    def forward(</span><span class="line">        self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_blocks: Tensor</span><span class="line">    ):</span><span class="line">        assert input_seq.ndim == 1</span><span class="line"></span><span class="line">        ve = [value_embed(input_seq) for value_embed in self.value_embeds]</span><span class="line">        # 012 ... 012 structure on token value embeddings by @YouJiacheng, improved on @leloykun&#x27;s U-net structure</span><span class="line">        ve = (</span><span class="line">            [ve[0], ve[1], ve[2], ve[3], ve[4]]</span><span class="line">            + [None] * (len(self.blocks) - 10)</span><span class="line">            + [ve[0], ve[1], ve[2], ve[3], ve[4]]</span><span class="line">        )</span><span class="line">        assert len(ve) == len(self.blocks)</span><span class="line"></span><span class="line">        long_bm, short_bm = self.create_blockmasks(input_seq, sliding_window_num_blocks)</span><span class="line">        block_masks = [</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_2_medium_r94_15_10-04-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_2_medium_r96_17_11-12-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

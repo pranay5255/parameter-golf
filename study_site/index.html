@@ -1,0 +1,2740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NanoGPT Speedrun Study Guide - 77 Records, Every Code Change</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+    <h1>NanoGPT Speedrun <span>Study Guide</span></h1>
+    <p class="subtitle">
+        From 45 minutes to 1.4 minutes: every optimization, every code diff, every technique.
+        A comprehensive study of 97 world records across 2 tracks.
+    </p>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="showTab('overview')">Overview</button>
+    <button class="tab" onclick="showTab('track1')">Track 1: GPT-2 Small (79)</button>
+    <button class="tab" onclick="showTab('track2')">Track 2: GPT-2 Medium (18)</button>
+    <button class="tab" onclick="showTab('chart')">Speed Chart</button>
+</div>
+
+<div class="container">
+
+<!-- Overview tab -->
+<div id="tab-overview" class="tab-content active">
+    <div class="stats">
+        <div class="stat-card">
+            <div class="number">97</div>
+            <div class="label">Total Records</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">59</div>
+            <div class="label">Records with PRs</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">58</div>
+            <div class="label">Records with Code Diffs</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">79</div>
+            <div class="label">Full Code Snapshots</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">242</div>
+            <div class="label">Training Logs</div>
+        </div>
+        <div class="stat-card">
+            <div class="number">31x</div>
+            <div class="label">Total Speedup (Track 1)</div>
+        </div>
+    </div>
+
+    <h2 style="margin: 1.5rem 0 0.5rem">Techniques by Category</h2>
+    <div class="filters">
+        <button class="filter-btn active" data-cat="all" onclick="toggleFilter(this)">all (97)</button>
+        <button class="filter-btn" data-cat="architecture" onclick="toggleFilter(this)">architecture (49)</button><button class="filter-btn" data-cat="optimizer" onclick="toggleFilter(this)">optimizer (27)</button><button class="filter-btn" data-cat="systems" onclick="toggleFilter(this)">systems (25)</button><button class="filter-btn" data-cat="training" onclick="toggleFilter(this)">training (25)</button><button class="filter-btn" data-cat="other" onclick="toggleFilter(this)">other (15)</button><button class="filter-btn" data-cat="data" onclick="toggleFilter(this)">data (15)</button>
+    </div>
+
+    <div class="study-note">
+        <h4>How to Use This Guide</h4>
+        <ul>
+            <li>Each record card links to a <strong>detailed study page</strong> with code diffs, PR descriptions, training metrics, and analysis.</li>
+            <li>Use the <strong>category filters</strong> to focus on specific types of changes (architecture, optimizer, systems, etc.).</li>
+            <li>The <strong>Speed Chart</strong> tab shows the progression of training speed over time.</li>
+            <li>Code diffs show exactly what changed in <code>train_gpt.py</code> for each record.</li>
+            <li>Full code snapshots (embedded in log files) let you see the complete training script at that point in time.</li>
+        </ul>
+    </div>
+
+    <h2 style="margin: 1.5rem 0 0.5rem">Track 1: GPT-2 Small (3.28 loss target)</h2>
+    <div class="timeline" id="timeline-all-t1">
+        
+        <a href="records/track_1_short_r01_1_05-28-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#1</span>
+                <span class="record-title">llm.c baseline</span>
+                <span class="record-time">45 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/28/24</span><span>@karpathy, llm.c contributors</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r02_2_06-06-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#2</span>
+                <span class="record-title">Tuned learning rate &amp; rotary embeddings</span>
+                <span class="record-time">31.4 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>06/06/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r03_3_10-04-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#3</span>
+                <span class="record-title">Introduced the Muon optimizer</span>
+                <span class="record-time">24.9 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/04/24</span><span>@kellerjordan0, @jxbz</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r04_4_10-11-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#4</span>
+                <span class="record-title">Muon improvements</span>
+                <span class="record-time">22.3 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/11/24</span><span>@kellerjordan0, @bozavlado</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r05_5_10-14-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#5</span>
+                <span class="record-title">Pad embeddings, ReLU², zero-init projections, QK-norm</span>
+                <span class="record-time">15.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/14/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r06_6_10-18-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#6</span>
+                <span class="record-title">Distributed the overhead of Muon</span>
+                <span class="record-time">13.1 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>10/18/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r07_7_10-18-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#7</span>
+                <span class="record-title">Upgraded PyTorch 2.5.0</span>
+                <span class="record-time">12.0 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>10/18/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r08_8_11-03-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#8</span>
+                <span class="record-title">Untied embedding and head</span>
+                <span class="record-time">10.8 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/03/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r09_9_11-06-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#9</span>
+                <span class="record-title">Value and embedding skip connections, momentum warmup, logit softcap</span>
+                <span class="record-time">8.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/06/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r10_10_11-08-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#10</span>
+                <span class="record-title">Bfloat16 activations</span>
+                <span class="record-time">7.8 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>11/08/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r11_11_11-10-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#11</span>
+                <span class="record-title">U-net pattern skip connections &amp; double lr</span>
+                <span class="record-time">7.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>11/10/24</span><span>@brendanh0gan</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r12_12_11-19-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#12</span>
+                <span class="record-title">1024-ctx dense causal attention → 64K-ctx FlexAttention</span>
+                <span class="record-time">5.03 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>11/19/24</span><span>@KoszarskyB</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r13_13_11-24-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#13</span>
+                <span class="record-title">Attention window warmup</span>
+                <span class="record-time">4.66 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/24/24</span><span>@fernbear.bsky.social</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r14_14_12-04-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#14</span>
+                <span class="record-title">Value Embeddings</span>
+                <span class="record-time">4.41 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/04/24</span><span>@KoszarskyB</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r15_15_12-08-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#15</span>
+                <span class="record-title">U-net pattern value embeddings, assorted code optimizations</span>
+                <span class="record-time">3.95 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/08/24</span><span>@leloykun, @YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r16_16_12-10-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#16</span>
+                <span class="record-title">Split value embeddings, block sliding window, separate block mask</span>
+                <span class="record-time">3.80 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>12/10/24</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r17_17_12-17-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#17</span>
+                <span class="record-title">Sparsify value embeddings, improve rotary embeddings, drop an attn layer</span>
+                <span class="record-time">3.57 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/17/24</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r18_18_01-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#18</span>
+                <span class="record-title">Lower logit softcap from 30 to 15</span>
+                <span class="record-time">3.4 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/04/25</span><span>@KoszarskyB</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r19_19_01-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#19</span>
+                <span class="record-title">FP8 head, offset logits, lr decay to 0.1 instead of 0.0</span>
+                <span class="record-time">3.142 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/13/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r20_20_01-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#20</span>
+                <span class="record-title">Merged QKV weights, long-short attention, attention scale, lower Adam epsilon, batched Muon</span>
+                <span class="record-time">2.992 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>01/16/25</span><span>@leloykun, @fernbear.bsky.social, @YouJiacheng, @brendanh0ga</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r21_21_01-26-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">Reduced batch size</span>
+                <span class="record-time">2.933 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>01/26/25</span><span>@leloykun</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r22_21_02-01-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">21st record with new timing</span>
+                <span class="record-time">2.997 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>02/01/25</span><span>not a new record, just re-timing #21 with the [updated rules</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r23_21_05-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">21st record with latest torch</span>
+                <span class="record-time">3.014 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/24/25</span><span>not a new record, just re-timing #21 with latest torch</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r24_22_05-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#22</span>
+                <span class="record-title">Faster gradient all-reduce</span>
+                <span class="record-time">2.990 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/24/25</span><span>@KonstantinWilleke, @alexrgilbert, @adricarda, @tuttyfrutyee</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r25_23_05-25-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#23</span>
+                <span class="record-title">Overlap computation and gradient communication</span>
+                <span class="record-time">2.979 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/25/25</span><span>@ryanyang0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r26_24_05-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#24</span>
+                <span class="record-title">Replace gradient all_reduce with reduce_scatter</span>
+                <span class="record-time">2.966 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/30/25</span><span>@vagrawal</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r27_25_07-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#25</span>
+                <span class="record-title">Upgrade PyTorch to 2.9.0.dev20250713+cu126</span>
+                <span class="record-time">2.896 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>07/13/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r28_26_07-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#26</span>
+                <span class="record-title">Align training batch starts with EoS, increase cooldown frac to .45</span>
+                <span class="record-time">2.863 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>07/13/25</span><span>@classiclarryd</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r29_27_07-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#27</span>
+                <span class="record-title">Transpose one of the MLP matrices + add Triton kernel for symmetric matmul</span>
+                <span class="record-time">2.817 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>07/18/25</span><span>@byronxu99</span><span>PR #109</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r30_28_08-23-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#28</span>
+                <span class="record-title">Sparse attention gate</span>
+                <span class="record-time">2.812 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>08/23/25</span><span>@classiclarryd</span><span>PR #117</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r31_29_09-03-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#29</span>
+                <span class="record-title">Flash Attention 3, 2048 max_doc_len, update ws schedule</span>
+                <span class="record-time">2.731 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/03/25</span><span>@varunneal</span><span>PR #118</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r32_30_09-05-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#30</span>
+                <span class="record-title">Drop first MLP layer</span>
+                <span class="record-time">2.717 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>09/05/25</span><span>@EmelyanenkoK</span><span>PR #120</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r33_31_09-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#31</span>
+                <span class="record-title">Dynamically incorporate YaRN during training and validation</span>
+                <span class="record-time">2.656 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/10/25</span><span>@classiclarryd</span><span>PR #122</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r34_32_09-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#32</span>
+                <span class="record-title">Optimize distributed training, improve skip connection gating, and enhance bfloat16 usage</span>
+                <span class="record-time">2.625 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>09/11/25</span><span>@bernard24 &amp; AI system [hiverge.ai](https://www.hiverge.ai/)</span><span>PR #125</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r35_33_09-15-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#33</span>
+                <span class="record-title">Asynchronously fetch and index data batches, extend final layer attention window for validation</span>
+                <span class="record-time">2.565 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/15/25</span><span>@classiclarryd</span><span>PR #127</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r36_34_09-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#34</span>
+                <span class="record-title">Smear token embeddings 1 position forward</span>
+                <span class="record-time">2.547 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/18/25</span><span>@classiclarryd</span><span>PR #130</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r37_35_09-21-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#35</span>
+                <span class="record-title">Drop first attn layer, extend all long windows for validation, update schedule</span>
+                <span class="record-time">2.527 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/21/25</span><span>@classiclarryd</span><span>PR #131</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r38_36_09-23-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#36</span>
+                <span class="record-title">MuonCustomSizing, perform mlp and attn reduce scatter in shared call</span>
+                <span class="record-time">2.495 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/23/25</span><span>@classiclarryd</span><span>PR #132</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r39_37_09-27-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#37</span>
+                <span class="record-title">Compute cross entropy in BF16 during training</span>
+                <span class="record-time">2.483 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>09/27/25</span><span>@Gusarich</span><span>PR #133</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r40_38_09-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#38</span>
+                <span class="record-title">Polar Express, replacement for Newton-Schulz</span>
+                <span class="record-time">2.476 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/29/25</span><span>@varunneal</span><span>PR #134</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r41_39_09-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#39</span>
+                <span class="record-title">Only update Adam params every other step, reduce batch size</span>
+                <span class="record-time">2.447 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/30/25</span><span>@classiclarryd</span><span>PR #136</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r42_40_10-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#40</span>
+                <span class="record-title">Backout, misc hyperparameter tuning, optimize lambda padding</span>
+                <span class="record-time">2.358 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/04/25</span><span>@classiclarryd</span><span>PR #140</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r43_41_10-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#41</span>
+                <span class="record-title">NorMuon</span>
+                <span class="record-time">2.345 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/24/25</span><span>@li_zichong</span><span>PR #144</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r44_42_10-27-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#42</span>
+                <span class="record-title">Update NorMuon LR, Step Logic</span>
+                <span class="record-time">2.313 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>10/27/25</span><span>@varunneal</span><span>PR #146</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r45_43_11-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#43</span>
+                <span class="record-title">Cautious Weight Decay w/ schedule</span>
+                <span class="record-time">2.284 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/10/25</span><span>@varunneal</span><span>PR #154</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r46_44_11-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#44</span>
+                <span class="record-title">Profiling 101</span>
+                <span class="record-time">2.269 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/16/25</span><span>@akash5474</span><span>PR #149</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r47_45_11-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#45</span>
+                <span class="record-title">Refine skip arch, update exponential decay init</span>
+                <span class="record-time">2.248 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/18/25</span><span>@classiclarryd</span><span>PR #159</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r48_46_11-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#46</span>
+                <span class="record-title">Batch size schedule</span>
+                <span class="record-time">2.203 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/29/25</span><span>@varunneal</span><span>PR #163</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r49_47_12-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#47</span>
+                <span class="record-title">Multiply attn lambda with weight instead of data, fix warmup</span>
+                <span class="record-time">2.193 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/10/25</span><span>@roeeshenberg</span><span>PR #166</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r50_48_12-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#48</span>
+                <span class="record-title">Speed up Muon, additional pre-multiply lambda, reshape matrices, update lr, update NorMuon axis</span>
+                <span class="record-time">2.170 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>12/11/25</span><span>@ChrisJMcCormick</span><span>PR #168</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r51_49_12-14-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#49</span>
+                <span class="record-title">Partial Key Offset</span>
+                <span class="record-time">2.146 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/14/25</span><span>@classiclarryd</span><span>PR #169</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r52_50_12-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#50</span>
+                <span class="record-title">Extend Cautious Weight Decay to Adam parameters</span>
+                <span class="record-time">2.128 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>12/18/25</span><span>@roeeshenberg</span><span>PR #172</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r53_51_12-19-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#51</span>
+                <span class="record-title">Retie Embed to lm_head, retune fp8 scales</span>
+                <span class="record-time">2.075 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/19/25</span><span>@varunneal</span><span>PR #175</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r54_52_12-21-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#52</span>
+                <span class="record-title">Smooth scalars via beta increase, decrease smear gate lr, freeze scalars during transitions, adam all reduce</span>
+                <span class="record-time">2.037 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/21/25</span><span>@ChrisJMcCormick</span><span>PR #177</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r55_53_12-22-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#53</span>
+                <span class="record-title">Multi-token prediction, untie embed/lm_head at 2/3 training, lr update, tweak CWD</span>
+                <span class="record-time">1.988 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/22/25</span><span>@varunneal, feat. @classiclarryd</span><span>PR #178</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r56_54_12-26-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#54</span>
+                <span class="record-title">Asymmetric Logit Rescale</span>
+                <span class="record-time">1.940 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/26/25</span><span>@classiclarryd</span><span>PR #181</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r57_55_12-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#55</span>
+                <span class="record-title">Gates on value embeds and skip connection</span>
+                <span class="record-time">1.918 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/29/25</span><span>@classiclarryd</span><span>PR #186</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r58_56_12-31-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#56</span>
+                <span class="record-title">Optimize and compile Adam, increase Adam buffer precision, move gates from Muon to Adam parameter banks</span>
+                <span class="record-time">1.894 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>12/31/25</span><span>@ChrisJMcCormick</span><span>PR #187</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r59_57_01-04-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#57</span>
+                <span class="record-title">Bfloat16 attn/mlp weights, mixed precision Muon, interweave Adam/Muon, finer-grain Adam beta</span>
+                <span class="record-time">1.878 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/04/26</span><span>@classiclarryd, feat. @YouJiacheng, @ChrisJMcCormick</span><span>PR #190</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r60_58_01-07-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#58</span>
+                <span class="record-title">Paired Head Attention</span>
+                <span class="record-time">1.820 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/07/26</span><span>@classiclarryd</span><span>PR #191</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r61_59_01-10-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#59</span>
+                <span class="record-title">Fused triton kernel for linear relu square MLP step</span>
+                <span class="record-time">1.781 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/10/26</span><span>@andrewbriand8, @Joshrav21</span><span>PR #197</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r62_60_01-16-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#60</span>
+                <span class="record-title">Fused triton kernel for softcapped multi-token prediction cross entropy step</span>
+                <span class="record-time">1.765 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/16/26</span><span>@soren_dunn_ &amp; AI System [Locus](https://www.intology.ai/blo</span><span>PR #199</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r63_61_01-18-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#61</span>
+                <span class="record-title">Unified Optimizers and Transposed LM Head</span>
+                <span class="record-time">1.748 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/18/26</span><span>@ChrisJMcCormick</span><span>PR #200</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r64_62_01-19-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#62</span>
+                <span class="record-title">Bigram Hash Embedding</span>
+                <span class="record-time">1.655 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/19/26</span><span>@classiclarryd</span><span>PR #201</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r65_63_01-26-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#63</span>
+                <span class="record-title">Untie Value Embeds</span>
+                <span class="record-time">1.650 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/26/26</span><span>@photon_mz</span><span>PR #209</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r66_64_01-30-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#64</span>
+                <span class="record-title">Tuned nonzero Attn V and O init</span>
+                <span class="record-time">1.630 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/30/26</span><span>@srashedll</span><span>PR #214</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r67_65_01-30-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#65</span>
+                <span class="record-title">Group Value Embeds into single parameter</span>
+                <span class="record-time">1.613 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/30/26</span><span>@varunneal</span><span>PR #215</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r68_66_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#66</span>
+                <span class="record-title">Torch 2.10</span>
+                <span class="record-time">1.595 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>-</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r69_67_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#67</span>
+                <span class="record-title">Tune fused softcap kernels and fuse fp8 quantization in LM head</span>
+                <span class="record-time">1.540 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>@andrewbriand8</span><span>PR #207</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r70_68_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#68</span>
+                <span class="record-title">Move bigram hash to GPU</span>
+                <span class="record-time">1.535 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>@dhrvji</span><span>PR #216</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r71_69_02-02-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#69</span>
+                <span class="record-title">Kernel Optimizations</span>
+                <span class="record-time">1.528 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/02/26</span><span>@EmmettBicker &amp; AI System [Aster](https://www.asterlab.ai/)</span><span>PR #217</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r72_70_02-03-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#70</span>
+                <span class="record-title">Tune value embed layout and ve_gates</span>
+                <span class="record-time">1.521 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>02/03/26</span><span>@photon_mz</span><span>PR #218</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r73_71_02-06-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#71</span>
+                <span class="record-title">Sparse bigram gradient comms and optimized loading on CPU</span>
+                <span class="record-time">1.516 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>02/06/26</span><span>@roeeshenberg</span><span>PR #221</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r74_72_02-10-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#72</span>
+                <span class="record-title">Increase minimum lr and add max_seq_len schedule</span>
+                <span class="record-time">1.496 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>02/10/26</span><span>@dualverse-ai &amp; AI System [Station](https://github.com/dualv</span><span>PR #224</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r75_73_02-12-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#73</span>
+                <span class="record-title">Partitioned Hyperconnections</span>
+                <span class="record-time">1.485 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>02/12/26</span><span>@sisovicm</span><span>PR #230</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r76_74_02-16-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#74</span>
+                <span class="record-title">Flattened GPT forward, removed post attention lambdas, added transpose kernels</span>
+                <span class="record-time">1.468 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/16/26</span><span>@ChrisJMcCormick</span><span>PR #233</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r77_75_02-23-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#75</span>
+                <span class="record-title">Cross Entropy Kernel Optimizations</span>
+                <span class="record-time">1.453 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/23/26</span><span>@moof2x</span><span>PR #235</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r78_76_02-28-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#76</span>
+                <span class="record-title">Reuse and tune backward transpose kernel</span>
+                <span class="record-time">1.446 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/28/26</span><span>@samacqua</span><span>PR #240</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r79_77_03-06-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#77</span>
+                <span class="record-title">Replace partitioned hyperconnections with single saved activation</span>
+                <span class="record-time">1.435 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>03/06/26</span><span>@classiclarryd</span><span>PR #241</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+    </div>
+
+    <h2 style="margin: 1.5rem 0 0.5rem">Track 2: GPT-2 Medium (2.92 loss target)</h2>
+    <div class="timeline" id="timeline-all-t2">
+        
+        <a href="records/track_2_medium_r80_1_05-28-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#1</span>
+                <span class="record-title">llm.c baseline (350M parameters)</span>
+                <span class="record-time">5.8 hours</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/28/24</span><span>@karpathy, llm.c contributors</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r81_2_01-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#2</span>
+                <span class="record-title">Initial record based on scaling up the GPT-2 small track speedrun</span>
+                <span class="record-time">29.3 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/18/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r82_3_02-08-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#3</span>
+                <span class="record-title">Added standard weight decay</span>
+                <span class="record-time">28.1 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>02/08/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r83_4_02-14-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#4</span>
+                <span class="record-title">Tuned Muon Newton-Schulz coefficients</span>
+                <span class="record-time">27.7 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>02/14/25</span><span>@leloykun</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r84_5_03-06-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#5</span>
+                <span class="record-title">Increased learning rate cooldown phase duration</span>
+                <span class="record-time">27.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>03/06/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r85_6_03-25-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#6</span>
+                <span class="record-title">2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern</span>
+                <span class="record-time">25.95 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>03/25/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r86_7_04-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#7</span>
+                <span class="record-title">Remove FP8 head; ISRU logits softcap; New sharded mixed precision Muon; merge weights</span>
+                <span class="record-time">25.29 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>04/16/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r87_8_04-22-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#8</span>
+                <span class="record-title">Cubic sliding window size schedule, 2× max window size (24.84 minutes)</span>
+                <span class="record-time">24.50 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>04/22/25</span><span>@jadenj3o</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r88_9_08-28-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#9</span>
+                <span class="record-title">Add two value embeddings</span>
+                <span class="record-time">24.12 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>08/28/25</span><span>@snimu</span><span>PR #119</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r89_10_09-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#10</span>
+                <span class="record-title">Second input embedding</span>
+                <span class="record-time">24.07 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>09/11/25</span><span>@snimu</span><span>PR #124</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r90_11_-.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#11</span>
+                <span class="record-title">Upgrade from torch 2.7 to torch==2.10.0.dev20251210+cu126</span>
+                <span class="record-time">23.45 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>-</span><span>-</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r91_12_09-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#12</span>
+                <span class="record-title">Snoo Optimizer (Outer optimizer around Adam and Muon)</span>
+                <span class="record-time">23.28 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/16/25</span><span>@dominikkallusky</span><span>PR #128</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r92_13_09-17-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#13</span>
+                <span class="record-title">EMA Wrapper on Muon</span>
+                <span class="record-time">23.14 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/17/25</span><span>@acutkosky</span><span>PR #129</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r93_14_09-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#14</span>
+                <span class="record-title">Combine both records 12 &amp; 13</span>
+                <span class="record-time">23.08 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>09/30/25</span><span>@acutkosky</span><span>PR #137</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r94_15_10-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#15</span>
+                <span class="record-title">Backout (Skip from 2/3 point to pre-lm_head)</span>
+                <span class="record-time">23.03 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/04/25</span><span>@snimu</span><span>PR #139</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r95_16_11-02-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#16</span>
+                <span class="record-title">Smear-MTP</span>
+                <span class="record-time">22.99 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>11/02/25</span><span>@snimu</span><span>PR #151</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r96_17_11-12-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#17</span>
+                <span class="record-title">Remove Redundant Mask Op</span>
+                <span class="record-time">22.98 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/12/25</span><span>@manikbhandari</span><span>PR #157</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r97_18_12-31-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#18</span>
+                <span class="record-title">Bulk transfer short track features</span>
+                <span class="record-time">17.35 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/31/25</span><span>-</span><span>PR #188</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+    </div>
+</div>
+
+<!-- Track 1 tab -->
+<div id="tab-track1" class="tab-content">
+    <h2 style="margin: 1rem 0">Track 1: GPT-2 Small — 45 min → 1.435 min</h2>
+    <div class="filters">
+        <button class="filter-btn active" data-cat="all" onclick="toggleFilter(this)">all</button>
+        <button class="filter-btn" data-cat="architecture" onclick="toggleFilter(this)">architecture (49)</button><button class="filter-btn" data-cat="optimizer" onclick="toggleFilter(this)">optimizer (27)</button><button class="filter-btn" data-cat="systems" onclick="toggleFilter(this)">systems (25)</button><button class="filter-btn" data-cat="training" onclick="toggleFilter(this)">training (25)</button><button class="filter-btn" data-cat="other" onclick="toggleFilter(this)">other (15)</button><button class="filter-btn" data-cat="data" onclick="toggleFilter(this)">data (15)</button>
+    </div>
+    <div class="timeline">
+        
+        <a href="records/track_1_short_r01_1_05-28-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#1</span>
+                <span class="record-title">llm.c baseline</span>
+                <span class="record-time">45 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/28/24</span><span>@karpathy, llm.c contributors</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r02_2_06-06-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#2</span>
+                <span class="record-title">Tuned learning rate &amp; rotary embeddings</span>
+                <span class="record-time">31.4 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>06/06/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r03_3_10-04-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#3</span>
+                <span class="record-title">Introduced the Muon optimizer</span>
+                <span class="record-time">24.9 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/04/24</span><span>@kellerjordan0, @jxbz</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r04_4_10-11-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#4</span>
+                <span class="record-title">Muon improvements</span>
+                <span class="record-time">22.3 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/11/24</span><span>@kellerjordan0, @bozavlado</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r05_5_10-14-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#5</span>
+                <span class="record-title">Pad embeddings, ReLU², zero-init projections, QK-norm</span>
+                <span class="record-time">15.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/14/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r06_6_10-18-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#6</span>
+                <span class="record-title">Distributed the overhead of Muon</span>
+                <span class="record-time">13.1 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>10/18/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r07_7_10-18-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#7</span>
+                <span class="record-title">Upgraded PyTorch 2.5.0</span>
+                <span class="record-time">12.0 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>10/18/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r08_8_11-03-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#8</span>
+                <span class="record-title">Untied embedding and head</span>
+                <span class="record-time">10.8 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/03/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r09_9_11-06-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#9</span>
+                <span class="record-title">Value and embedding skip connections, momentum warmup, logit softcap</span>
+                <span class="record-time">8.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/06/24</span><span>@Grad62304977, @kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r10_10_11-08-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#10</span>
+                <span class="record-title">Bfloat16 activations</span>
+                <span class="record-time">7.8 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>11/08/24</span><span>@kellerjordan0</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r11_11_11-10-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#11</span>
+                <span class="record-title">U-net pattern skip connections &amp; double lr</span>
+                <span class="record-time">7.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>11/10/24</span><span>@brendanh0gan</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r12_12_11-19-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#12</span>
+                <span class="record-title">1024-ctx dense causal attention → 64K-ctx FlexAttention</span>
+                <span class="record-time">5.03 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>11/19/24</span><span>@KoszarskyB</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r13_13_11-24-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#13</span>
+                <span class="record-title">Attention window warmup</span>
+                <span class="record-time">4.66 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/24/24</span><span>@fernbear.bsky.social</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r14_14_12-04-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#14</span>
+                <span class="record-title">Value Embeddings</span>
+                <span class="record-time">4.41 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/04/24</span><span>@KoszarskyB</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r15_15_12-08-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#15</span>
+                <span class="record-title">U-net pattern value embeddings, assorted code optimizations</span>
+                <span class="record-time">3.95 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/08/24</span><span>@leloykun, @YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r16_16_12-10-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#16</span>
+                <span class="record-title">Split value embeddings, block sliding window, separate block mask</span>
+                <span class="record-time">3.80 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>12/10/24</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r17_17_12-17-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#17</span>
+                <span class="record-title">Sparsify value embeddings, improve rotary embeddings, drop an attn layer</span>
+                <span class="record-time">3.57 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/17/24</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r18_18_01-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#18</span>
+                <span class="record-title">Lower logit softcap from 30 to 15</span>
+                <span class="record-time">3.4 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/04/25</span><span>@KoszarskyB</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r19_19_01-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#19</span>
+                <span class="record-title">FP8 head, offset logits, lr decay to 0.1 instead of 0.0</span>
+                <span class="record-time">3.142 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/13/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r20_20_01-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#20</span>
+                <span class="record-title">Merged QKV weights, long-short attention, attention scale, lower Adam epsilon, batched Muon</span>
+                <span class="record-time">2.992 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>01/16/25</span><span>@leloykun, @fernbear.bsky.social, @YouJiacheng, @brendanh0ga</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r21_21_01-26-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">Reduced batch size</span>
+                <span class="record-time">2.933 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>01/26/25</span><span>@leloykun</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r22_21_02-01-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">21st record with new timing</span>
+                <span class="record-time">2.997 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>02/01/25</span><span>not a new record, just re-timing #21 with the [updated rules</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r23_21_05-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#21</span>
+                <span class="record-title">21st record with latest torch</span>
+                <span class="record-time">3.014 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/24/25</span><span>not a new record, just re-timing #21 with latest torch</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r24_22_05-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#22</span>
+                <span class="record-title">Faster gradient all-reduce</span>
+                <span class="record-time">2.990 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/24/25</span><span>@KonstantinWilleke, @alexrgilbert, @adricarda, @tuttyfrutyee</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r25_23_05-25-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#23</span>
+                <span class="record-title">Overlap computation and gradient communication</span>
+                <span class="record-time">2.979 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/25/25</span><span>@ryanyang0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r26_24_05-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#24</span>
+                <span class="record-title">Replace gradient all_reduce with reduce_scatter</span>
+                <span class="record-time">2.966 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>05/30/25</span><span>@vagrawal</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r27_25_07-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#25</span>
+                <span class="record-title">Upgrade PyTorch to 2.9.0.dev20250713+cu126</span>
+                <span class="record-time">2.896 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>07/13/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r28_26_07-13-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#26</span>
+                <span class="record-title">Align training batch starts with EoS, increase cooldown frac to .45</span>
+                <span class="record-time">2.863 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>07/13/25</span><span>@classiclarryd</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r29_27_07-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#27</span>
+                <span class="record-title">Transpose one of the MLP matrices + add Triton kernel for symmetric matmul</span>
+                <span class="record-time">2.817 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>07/18/25</span><span>@byronxu99</span><span>PR #109</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r30_28_08-23-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#28</span>
+                <span class="record-title">Sparse attention gate</span>
+                <span class="record-time">2.812 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>08/23/25</span><span>@classiclarryd</span><span>PR #117</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r31_29_09-03-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#29</span>
+                <span class="record-title">Flash Attention 3, 2048 max_doc_len, update ws schedule</span>
+                <span class="record-time">2.731 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/03/25</span><span>@varunneal</span><span>PR #118</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r32_30_09-05-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#30</span>
+                <span class="record-title">Drop first MLP layer</span>
+                <span class="record-time">2.717 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>09/05/25</span><span>@EmelyanenkoK</span><span>PR #120</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r33_31_09-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#31</span>
+                <span class="record-title">Dynamically incorporate YaRN during training and validation</span>
+                <span class="record-time">2.656 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/10/25</span><span>@classiclarryd</span><span>PR #122</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r34_32_09-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#32</span>
+                <span class="record-title">Optimize distributed training, improve skip connection gating, and enhance bfloat16 usage</span>
+                <span class="record-time">2.625 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>09/11/25</span><span>@bernard24 &amp; AI system [hiverge.ai](https://www.hiverge.ai/)</span><span>PR #125</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r35_33_09-15-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#33</span>
+                <span class="record-title">Asynchronously fetch and index data batches, extend final layer attention window for validation</span>
+                <span class="record-time">2.565 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/15/25</span><span>@classiclarryd</span><span>PR #127</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r36_34_09-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture data" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#34</span>
+                <span class="record-title">Smear token embeddings 1 position forward</span>
+                <span class="record-time">2.547 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-data">data</span></div>
+            <div class="record-meta"><span>09/18/25</span><span>@classiclarryd</span><span>PR #130</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r37_35_09-21-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#35</span>
+                <span class="record-title">Drop first attn layer, extend all long windows for validation, update schedule</span>
+                <span class="record-time">2.527 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/21/25</span><span>@classiclarryd</span><span>PR #131</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r38_36_09-23-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#36</span>
+                <span class="record-title">MuonCustomSizing, perform mlp and attn reduce scatter in shared call</span>
+                <span class="record-time">2.495 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/23/25</span><span>@classiclarryd</span><span>PR #132</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r39_37_09-27-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#37</span>
+                <span class="record-title">Compute cross entropy in BF16 during training</span>
+                <span class="record-time">2.483 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>09/27/25</span><span>@Gusarich</span><span>PR #133</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r40_38_09-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#38</span>
+                <span class="record-title">Polar Express, replacement for Newton-Schulz</span>
+                <span class="record-time">2.476 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/29/25</span><span>@varunneal</span><span>PR #134</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r41_39_09-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#39</span>
+                <span class="record-title">Only update Adam params every other step, reduce batch size</span>
+                <span class="record-time">2.447 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>09/30/25</span><span>@classiclarryd</span><span>PR #136</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r42_40_10-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#40</span>
+                <span class="record-title">Backout, misc hyperparameter tuning, optimize lambda padding</span>
+                <span class="record-time">2.358 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/04/25</span><span>@classiclarryd</span><span>PR #140</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r43_41_10-24-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#41</span>
+                <span class="record-title">NorMuon</span>
+                <span class="record-time">2.345 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>10/24/25</span><span>@li_zichong</span><span>PR #144</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r44_42_10-27-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#42</span>
+                <span class="record-title">Update NorMuon LR, Step Logic</span>
+                <span class="record-time">2.313 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>10/27/25</span><span>@varunneal</span><span>PR #146</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r45_43_11-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#43</span>
+                <span class="record-title">Cautious Weight Decay w/ schedule</span>
+                <span class="record-time">2.284 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/10/25</span><span>@varunneal</span><span>PR #154</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r46_44_11-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#44</span>
+                <span class="record-title">Profiling 101</span>
+                <span class="record-time">2.269 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/16/25</span><span>@akash5474</span><span>PR #149</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r47_45_11-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#45</span>
+                <span class="record-title">Refine skip arch, update exponential decay init</span>
+                <span class="record-time">2.248 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/18/25</span><span>@classiclarryd</span><span>PR #159</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r48_46_11-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#46</span>
+                <span class="record-title">Batch size schedule</span>
+                <span class="record-time">2.203 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>11/29/25</span><span>@varunneal</span><span>PR #163</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r49_47_12-10-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#47</span>
+                <span class="record-title">Multiply attn lambda with weight instead of data, fix warmup</span>
+                <span class="record-time">2.193 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/10/25</span><span>@roeeshenberg</span><span>PR #166</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r50_48_12-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#48</span>
+                <span class="record-title">Speed up Muon, additional pre-multiply lambda, reshape matrices, update lr, update NorMuon axis</span>
+                <span class="record-time">2.170 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>12/11/25</span><span>@ChrisJMcCormick</span><span>PR #168</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r51_49_12-14-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#49</span>
+                <span class="record-title">Partial Key Offset</span>
+                <span class="record-time">2.146 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/14/25</span><span>@classiclarryd</span><span>PR #169</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r52_50_12-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#50</span>
+                <span class="record-title">Extend Cautious Weight Decay to Adam parameters</span>
+                <span class="record-time">2.128 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>12/18/25</span><span>@roeeshenberg</span><span>PR #172</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r53_51_12-19-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#51</span>
+                <span class="record-title">Retie Embed to lm_head, retune fp8 scales</span>
+                <span class="record-time">2.075 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/19/25</span><span>@varunneal</span><span>PR #175</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r54_52_12-21-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#52</span>
+                <span class="record-title">Smooth scalars via beta increase, decrease smear gate lr, freeze scalars during transitions, adam all reduce</span>
+                <span class="record-time">2.037 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/21/25</span><span>@ChrisJMcCormick</span><span>PR #177</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r55_53_12-22-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#53</span>
+                <span class="record-title">Multi-token prediction, untie embed/lm_head at 2/3 training, lr update, tweak CWD</span>
+                <span class="record-time">1.988 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>12/22/25</span><span>@varunneal, feat. @classiclarryd</span><span>PR #178</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r56_54_12-26-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#54</span>
+                <span class="record-title">Asymmetric Logit Rescale</span>
+                <span class="record-time">1.940 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/26/25</span><span>@classiclarryd</span><span>PR #181</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r57_55_12-29-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#55</span>
+                <span class="record-title">Gates on value embeds and skip connection</span>
+                <span class="record-time">1.918 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>12/29/25</span><span>@classiclarryd</span><span>PR #186</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r58_56_12-31-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#56</span>
+                <span class="record-title">Optimize and compile Adam, increase Adam buffer precision, move gates from Muon to Adam parameter banks</span>
+                <span class="record-time">1.894 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>12/31/25</span><span>@ChrisJMcCormick</span><span>PR #187</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r59_57_01-04-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#57</span>
+                <span class="record-title">Bfloat16 attn/mlp weights, mixed precision Muon, interweave Adam/Muon, finer-grain Adam beta</span>
+                <span class="record-time">1.878 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/04/26</span><span>@classiclarryd, feat. @YouJiacheng, @ChrisJMcCormick</span><span>PR #190</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r60_58_01-07-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#58</span>
+                <span class="record-title">Paired Head Attention</span>
+                <span class="record-time">1.820 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/07/26</span><span>@classiclarryd</span><span>PR #191</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r61_59_01-10-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#59</span>
+                <span class="record-title">Fused triton kernel for linear relu square MLP step</span>
+                <span class="record-time">1.781 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/10/26</span><span>@andrewbriand8, @Joshrav21</span><span>PR #197</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r62_60_01-16-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#60</span>
+                <span class="record-title">Fused triton kernel for softcapped multi-token prediction cross entropy step</span>
+                <span class="record-time">1.765 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/16/26</span><span>@soren_dunn_ &amp; AI System [Locus](https://www.intology.ai/blo</span><span>PR #199</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r63_61_01-18-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#61</span>
+                <span class="record-title">Unified Optimizers and Transposed LM Head</span>
+                <span class="record-time">1.748 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/18/26</span><span>@ChrisJMcCormick</span><span>PR #200</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r64_62_01-19-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#62</span>
+                <span class="record-title">Bigram Hash Embedding</span>
+                <span class="record-time">1.655 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/19/26</span><span>@classiclarryd</span><span>PR #201</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r65_63_01-26-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#63</span>
+                <span class="record-title">Untie Value Embeds</span>
+                <span class="record-time">1.650 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>01/26/26</span><span>@photon_mz</span><span>PR #209</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r66_64_01-30-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#64</span>
+                <span class="record-title">Tuned nonzero Attn V and O init</span>
+                <span class="record-time">1.630 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/30/26</span><span>@srashedll</span><span>PR #214</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r67_65_01-30-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#65</span>
+                <span class="record-title">Group Value Embeds into single parameter</span>
+                <span class="record-time">1.613 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/30/26</span><span>@varunneal</span><span>PR #215</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r68_66_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#66</span>
+                <span class="record-title">Torch 2.10</span>
+                <span class="record-time">1.595 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>-</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r69_67_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#67</span>
+                <span class="record-title">Tune fused softcap kernels and fuse fp8 quantization in LM head</span>
+                <span class="record-time">1.540 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>@andrewbriand8</span><span>PR #207</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r70_68_01-31-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#68</span>
+                <span class="record-title">Move bigram hash to GPU</span>
+                <span class="record-time">1.535 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>01/31/26</span><span>@dhrvji</span><span>PR #216</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r71_69_02-02-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#69</span>
+                <span class="record-title">Kernel Optimizations</span>
+                <span class="record-time">1.528 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/02/26</span><span>@EmmettBicker &amp; AI System [Aster](https://www.asterlab.ai/)</span><span>PR #217</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r72_70_02-03-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#70</span>
+                <span class="record-title">Tune value embed layout and ve_gates</span>
+                <span class="record-time">1.521 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>02/03/26</span><span>@photon_mz</span><span>PR #218</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r73_71_02-06-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#71</span>
+                <span class="record-title">Sparse bigram gradient comms and optimized loading on CPU</span>
+                <span class="record-time">1.516 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>02/06/26</span><span>@roeeshenberg</span><span>PR #221</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r74_72_02-10-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer data training" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#72</span>
+                <span class="record-title">Increase minimum lr and add max_seq_len schedule</span>
+                <span class="record-time">1.496 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>02/10/26</span><span>@dualverse-ai &amp; AI System [Station](https://github.com/dualv</span><span>PR #224</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r75_73_02-12-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#73</span>
+                <span class="record-title">Partitioned Hyperconnections</span>
+                <span class="record-time">1.485 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>02/12/26</span><span>@sisovicm</span><span>PR #230</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r76_74_02-16-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#74</span>
+                <span class="record-title">Flattened GPT forward, removed post attention lambdas, added transpose kernels</span>
+                <span class="record-time">1.468 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/16/26</span><span>@ChrisJMcCormick</span><span>PR #233</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r77_75_02-23-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#75</span>
+                <span class="record-title">Cross Entropy Kernel Optimizations</span>
+                <span class="record-time">1.453 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/23/26</span><span>@moof2x</span><span>PR #235</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r78_76_02-28-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="systems" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#76</span>
+                <span class="record-title">Reuse and tune backward transpose kernel</span>
+                <span class="record-time">1.446 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>02/28/26</span><span>@samacqua</span><span>PR #240</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_1_short_r79_77_03-06-26.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_1_short">
+            <div class="record-header">
+                <span class="record-num">#77</span>
+                <span class="record-title">Replace partitioned hyperconnections with single saved activation</span>
+                <span class="record-time">1.435 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>03/06/26</span><span>@classiclarryd</span><span>PR #241</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+    </div>
+</div>
+
+<!-- Track 2 tab -->
+<div id="tab-track2" class="tab-content">
+    <h2 style="margin: 1rem 0">Track 2: GPT-2 Medium — 5.8 hours → 17.35 min</h2>
+    <div class="timeline">
+        
+        <a href="records/track_2_medium_r80_1_05-28-24.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#1</span>
+                <span class="record-title">llm.c baseline (350M parameters)</span>
+                <span class="record-time">5.8 hours</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>05/28/24</span><span>@karpathy, llm.c contributors</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r81_2_01-18-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#2</span>
+                <span class="record-title">Initial record based on scaling up the GPT-2 small track speedrun</span>
+                <span class="record-time">29.3 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>01/18/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r82_3_02-08-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#3</span>
+                <span class="record-title">Added standard weight decay</span>
+                <span class="record-time">28.1 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>02/08/25</span><span>@kellerjordan0</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r83_4_02-14-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#4</span>
+                <span class="record-title">Tuned Muon Newton-Schulz coefficients</span>
+                <span class="record-time">27.7 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>02/14/25</span><span>@leloykun</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r84_5_03-06-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#5</span>
+                <span class="record-title">Increased learning rate cooldown phase duration</span>
+                <span class="record-time">27.2 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>03/06/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r85_6_03-25-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture systems training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#6</span>
+                <span class="record-title">2x MLP wd, qkv norm, all_reduce/opt.step() overlap, optimized skip pattern</span>
+                <span class="record-time">25.95 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>03/25/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r86_7_04-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture optimizer systems" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#7</span>
+                <span class="record-title">Remove FP8 head; ISRU logits softcap; New sharded mixed precision Muon; merge weights</span>
+                <span class="record-time">25.29 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span><span class="badge badge-optimizer">optimizer</span><span class="badge badge-systems">systems</span></div>
+            <div class="record-meta"><span>04/16/25</span><span>@YouJiacheng</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r87_8_04-22-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="data training" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#8</span>
+                <span class="record-title">Cubic sliding window size schedule, 2× max window size (24.84 minutes)</span>
+                <span class="record-time">24.50 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-data">data</span><span class="badge badge-training">training</span></div>
+            <div class="record-meta"><span>04/22/25</span><span>@jadenj3o</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r88_9_08-28-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#9</span>
+                <span class="record-title">Add two value embeddings</span>
+                <span class="record-time">24.12 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>08/28/25</span><span>@snimu</span><span>PR #119</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r89_10_09-11-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#10</span>
+                <span class="record-title">Second input embedding</span>
+                <span class="record-time">24.07 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>09/11/25</span><span>@snimu</span><span>PR #124</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r90_11_-.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#11</span>
+                <span class="record-title">Upgrade from torch 2.7 to torch==2.10.0.dev20251210+cu126</span>
+                <span class="record-time">23.45 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>-</span><span>-</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r91_12_09-16-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#12</span>
+                <span class="record-title">Snoo Optimizer (Outer optimizer around Adam and Muon)</span>
+                <span class="record-time">23.28 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/16/25</span><span>@dominikkallusky</span><span>PR #128</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r92_13_09-17-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="optimizer" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#13</span>
+                <span class="record-title">EMA Wrapper on Muon</span>
+                <span class="record-time">23.14 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-optimizer">optimizer</span></div>
+            <div class="record-meta"><span>09/17/25</span><span>@acutkosky</span><span>PR #129</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r93_14_09-30-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#14</span>
+                <span class="record-title">Combine both records 12 &amp; 13</span>
+                <span class="record-time">23.08 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>09/30/25</span><span>@acutkosky</span><span>PR #137</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r94_15_10-04-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#15</span>
+                <span class="record-title">Backout (Skip from 2/3 point to pre-lm_head)</span>
+                <span class="record-time">23.03 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>10/04/25</span><span>@snimu</span><span>PR #139</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r95_16_11-02-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="architecture" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#16</span>
+                <span class="record-title">Smear-MTP</span>
+                <span class="record-time">22.99 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-architecture">architecture</span></div>
+            <div class="record-meta"><span>11/02/25</span><span>@snimu</span><span>PR #151</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r96_17_11-12-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#17</span>
+                <span class="record-title">Remove Redundant Mask Op</span>
+                <span class="record-time">22.98 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>11/12/25</span><span>@manikbhandari</span><span>PR #157</span><span style="color:var(--green)">Has Code Snapshot</span></div>
+        </div>
+        </a>
+
+        <a href="records/track_2_medium_r97_18_12-31-25.html" style="text-decoration:none;color:inherit">
+        <div class="record-card" data-categories="other" data-track="track_2_medium">
+            <div class="record-header">
+                <span class="record-num">#18</span>
+                <span class="record-title">Bulk transfer short track features</span>
+                <span class="record-time">17.35 min</span>
+            </div>
+            <div class="record-badges"><span class="badge badge-other">other</span></div>
+            <div class="record-meta"><span>12/31/25</span><span>-</span><span>PR #188</span><span style="color:var(--green)">Has Code Snapshot</span><span style="color:var(--yellow)">Has Code Diff</span></div>
+        </div>
+        </a>
+    </div>
+</div>
+
+<!-- Chart tab -->
+<div id="tab-chart" class="tab-content">
+    <h2 style="margin: 1rem 0">Speed Progression</h2>
+    <h3 style="color: var(--muted); margin: 0.5rem 0">Track 1: GPT-2 Small</h3>
+    <div class="chart-container"><svg viewBox="0 0 900 340" class="chart-svg"><line x1="70" y1="20.0" x2="870" y2="20.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="24.0" fill="#8b949e" font-size="11" text-anchor="end">1.4m</text><line x1="70" y1="87.5" x2="870" y2="87.5" stroke="#30363d" stroke-width="0.5"/><text x="60" y="91.5" fill="#8b949e" font-size="11" text-anchor="end">12.3m</text><line x1="70" y1="155.0" x2="870" y2="155.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="159.0" fill="#8b949e" font-size="11" text-anchor="end">23.2m</text><line x1="70" y1="222.5" x2="870" y2="222.5" stroke="#30363d" stroke-width="0.5"/><text x="60" y="226.5" fill="#8b949e" font-size="11" text-anchor="end">34.1m</text><line x1="70" y1="290.0" x2="870" y2="290.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="294.0" fill="#8b949e" font-size="11" text-anchor="end">45.0m</text><path d="M70.0,290.0 L80.5,205.7 L91.1,165.4 L101.6,149.3 L112.1,105.3 L122.6,92.3 L133.2,85.5 L143.7,78.0 L154.2,61.9 L164.7,59.4 L175.3,55.7 L185.8,42.3 L196.3,40.0 L206.8,38.4 L217.4,35.6 L227.9,34.7 L238.4,33.2 L248.9,32.2 L259.5,30.6 L270.0,29.6 L280.5,29.3 L280.5,29.7 L280.5,29.8 L291.1,29.6 L301.6,29.6 L312.1,29.5 L322.6,29.1 L333.2,28.9 L343.7,28.6 L354.2,28.5 L364.7,28.0 L375.3,27.9 L385.8,27.6 L396.3,27.4 L406.8,27.0 L417.4,26.9 L427.9,26.8 L438.4,26.6 L448.9,26.5 L459.5,26.5 L470.0,26.3 L480.5,25.7 L491.1,25.6 L501.6,25.4 L512.1,25.3 L522.6,25.2 L533.2,25.0 L543.7,24.8 L554.2,24.7 L564.7,24.6 L575.3,24.4 L585.8,24.3 L596.3,24.0 L606.8,23.7 L617.4,23.4 L627.9,23.1 L638.4,23.0 L648.9,22.8 L659.5,22.7 L670.0,22.4 L680.5,22.1 L691.1,22.0 L701.6,21.9 L712.1,21.4 L722.6,21.3 L733.2,21.2 L743.7,21.1 L754.2,21.0 L764.7,20.7 L775.3,20.6 L785.8,20.6 L796.3,20.5 L806.8,20.5 L817.4,20.4 L827.9,20.3 L838.4,20.2 L848.9,20.1 L859.5,20.1 L870.0,20.0" fill="none" stroke="#58a6ff" stroke-width="2"/><circle cx="70.0" cy="290.0" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #1: 45.00min - llm.c baseline</title></circle><circle cx="80.52631578947368" cy="205.71215425226674" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #2: 31.40min - Tuned learning rate &amp; rotary embeddings</title></circle><circle cx="91.05263157894737" cy="165.42752209342362" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #3: 24.90min - Introduced the Muon optimizer</title></circle><circle cx="101.57894736842105" cy="149.31366922988641" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #4: 22.30min - Muon improvements</title></circle><circle cx="112.10526315789474" cy="105.31045564099621" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #5: 15.20min - Pad embeddings, ReLU², zero-init project</title></circle><circle cx="122.63157894736841" cy="92.29542063583152" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #6: 13.10min - Distributed the overhead of Muon</title></circle><circle cx="133.1578947368421" cy="85.47802134741191" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #7: 12.00min - Upgraded PyTorch 2.5.0</title></circle><circle cx="143.68421052631578" cy="78.0408584873178" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #8: 10.80min - Untied embedding and head</title></circle><circle cx="154.21052631578948" cy="61.92700562378056" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #9: 8.20min - Value and embedding skip connections, mo</title></circle><circle cx="164.73684210526315" cy="59.44795133708252" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #10: 7.80min - Bfloat16 activations</title></circle><circle cx="175.26315789473682" cy="55.72936990703547" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #11: 7.20min - U-net pattern skip connections &amp; double </title></circle><circle cx="185.78947368421052" cy="42.28050040169862" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #12: 5.03min - 1024-ctx dense causal attention → 64K-ct</title></circle><circle cx="196.31578947368422" cy="39.98737518650293" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #13: 4.66min - Attention window warmup</title></circle><circle cx="206.8421052631579" cy="38.43796625731665" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #14: 4.41min - Value Embeddings</title></circle><circle cx="217.36842105263156" cy="35.587053827613914" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #15: 3.95min - U-net pattern value embeddings, assorted</title></circle><circle cx="227.89473684210526" cy="34.65740847010215" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #16: 3.80min - Split value embeddings, block sliding wi</title></circle><circle cx="238.42105263157893" cy="33.231952255250775" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #17: 3.57min - Sparsify value embeddings, improve rotar</title></circle><circle cx="248.94736842105263" cy="32.17835418340411" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #18: 3.40min - Lower logit softcap from 30 to 15</title></circle><circle cx="259.4736842105263" cy="30.579364168483874" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #19: 3.14min - FP8 head, offset logits, lr decay to 0.1</title></circle><circle cx="270.0" cy="29.64971881097211" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #20: 2.99min - Merged QKV weights, long-short attention</title></circle><circle cx="280.52631578947364" cy="29.284058303684148" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #21: 2.93min - Reduced batch size</title></circle><circle cx="280.52631578947364" cy="29.680706989555837" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #21: 3.00min - 21st record with new timing</title></circle><circle cx="280.52631578947364" cy="29.786066796740503" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #21: 3.01min - 21st record with latest torch</title></circle><circle cx="291.0526315789474" cy="29.63732353953862" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #22: 2.99min - Faster gradient all-reduce</title></circle><circle cx="301.57894736842104" cy="29.569149546654426" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #23: 2.98min - Overlap computation and gradient communi</title></circle><circle cx="312.10526315789474" cy="29.48858028233674" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #24: 2.97min - Replace gradient all_reduce with reduce_</title></circle><circle cx="322.63157894736844" cy="29.05474578216458" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #25: 2.90min - Upgrade PyTorch to 2.9.0.dev20250713+cu1</title></circle><circle cx="333.15789473684214" cy="28.850223803511994" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #26: 2.86min - Align training batch starts with EoS, in</title></circle><circle cx="343.6842105263158" cy="28.56513256054172" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #27: 2.82min - Transpose one of the MLP matrices + add </title></circle><circle cx="354.2105263157895" cy="28.534144381957994" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #28: 2.81min - Sparse attention gate</title></circle><circle cx="364.7368421052631" cy="28.032135888901642" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #29: 2.73min - Flash Attention 3, 2048 max_doc_len, upd</title></circle><circle cx="375.2631578947369" cy="27.94536898886721" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #30: 2.72min - Drop first MLP layer</title></circle><circle cx="385.7894736842105" cy="27.56731321014576" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #31: 2.66min - Dynamically incorporate YaRN during trai</title></circle><circle cx="396.3157894736842" cy="27.37518650292666" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #32: 2.62min - Optimize distributed training, improve s</title></circle><circle cx="406.84210526315786" cy="27.003328359921955" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #33: 2.56min - Asynchronously fetch and index data batc</title></circle><circle cx="417.3684210526316" cy="26.891770917020544" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #34: 2.55min - Smear token embeddings 1 position forwar</title></circle><circle cx="427.89473684210526" cy="26.767818202685643" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #35: 2.53min - Drop first attn layer, extend all long w</title></circle><circle cx="438.42105263157896" cy="26.569493859749798" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #36: 2.50min - MuonCustomSizing, perform mlp and attn r</title></circle><circle cx="448.9473684210526" cy="26.49512223114886" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #37: 2.48min - Compute cross entropy in BF16 during tra</title></circle><circle cx="459.4736842105263" cy="26.451738781131642" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #38: 2.48min - Polar Express, replacement for Newton-Sc</title></circle><circle cx="470.0" cy="26.272007345346033" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #39: 2.45min - Only update Adam params every other step</title></circle><circle cx="480.5263157894737" cy="25.72041776655572" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #40: 2.36min - Backout, misc hyperparameter tuning, opt</title></circle><circle cx="491.05263157894734" cy="25.639848502238035" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #41: 2.35min - NorMuon</title></circle><circle cx="501.57894736842104" cy="25.441524159302194" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #42: 2.31min - Update NorMuon LR, Step Logic</title></circle><circle cx="512.1052631578948" cy="25.261792723516585" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #43: 2.28min - Cautious Weight Decay w/ schedule</title></circle><circle cx="522.6315789473683" cy="25.16882818776541" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #44: 2.27min - Profiling 101</title></circle><circle cx="533.1578947368421" cy="25.038677837713763" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #45: 2.25min - Refine skip arch, update exponential dec</title></circle><circle cx="543.6842105263157" cy="24.75978423046023" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #46: 2.20min - Batch size schedule</title></circle><circle cx="554.2105263157895" cy="24.69780787329278" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #47: 2.19min - Multiply attn lambda with weight instead</title></circle><circle cx="564.7368421052631" cy="24.555262251807644" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #48: 2.17min - Speed up Muon, additional pre-multiply l</title></circle><circle cx="575.2631578947369" cy="24.40651899460576" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #49: 2.15min - Partial Key Offset</title></circle><circle cx="585.7894736842105" cy="24.29496155170435" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #50: 2.13min - Extend Cautious Weight Decay to Adam par</title></circle><circle cx="596.3157894736843" cy="23.966486858716863" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #51: 2.08min - Retie Embed to lm_head, retune fp8 scale</title></circle><circle cx="606.8421052631579" cy="23.730976701480547" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #52: 2.04min - Smooth scalars via beta increase, decrea</title></circle><circle cx="617.3684210526316" cy="23.427292551360036" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #53: 1.99min - Multi-token prediction, untie embed/lm_h</title></circle><circle cx="627.8947368421052" cy="23.12980603695627" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #54: 1.94min - Asymmetric Logit Rescale</title></circle><circle cx="638.421052631579" cy="22.99345805118788" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #55: 1.92min - Gates on value embeds and skip connectio</title></circle><circle cx="648.9473684210526" cy="22.844714793985997" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #56: 1.89min - Optimize and compile Adam, increase Adam</title></circle><circle cx="659.4736842105262" cy="22.745552622518076" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #57: 1.88min - Bfloat16 attn/mlp weights, mixed precisi</title></circle><circle cx="670.0" cy="22.386089750946862" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #58: 1.82min - Paired Head Attention</title></circle><circle cx="680.5263157894738" cy="22.1443819579938" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #59: 1.78min - Fused triton kernel for linear relu squa</title></circle><circle cx="691.0526315789474" cy="22.04521978652588" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #60: 1.76min - Fused triton kernel for softcapped multi</title></circle><circle cx="701.578947368421" cy="21.939859979341215" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #61: 1.75min - Unified Optimizers and Transposed LM Hea</title></circle><circle cx="712.1052631578948" cy="21.36347985768392" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #62: 1.66min - Bigram Hash Embedding</title></circle><circle cx="722.6315789473684" cy="21.332491679100194" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #63: 1.65min - Untie Value Embeds</title></circle><circle cx="733.1578947368421" cy="21.208538964765292" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #64: 1.63min - Tuned nonzero Attn V and O init</title></circle><circle cx="743.6842105263157" cy="21.103179157580627" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #65: 1.61min - Group Value Embeds into single parameter</title></circle><circle cx="754.2105263157895" cy="20.991621714679216" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #66: 1.59min - Torch 2.10</title></circle><circle cx="764.7368421052632" cy="20.650751750258234" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #67: 1.54min - Tune fused softcap kernels and fuse fp8 </title></circle><circle cx="775.2631578947368" cy="20.619763571674508" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #68: 1.53min - Move bigram hash to GPU</title></circle><circle cx="785.7894736842105" cy="20.576380121657294" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #69: 1.53min - Kernel Optimizations</title></circle><circle cx="796.3157894736843" cy="20.532996671640078" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #70: 1.52min - Tune value embed layout and ve_gates</title></circle><circle cx="806.8421052631579" cy="20.50200849305635" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #71: 1.52min - Sparse bigram gradient comms and optimiz</title></circle><circle cx="817.3684210526316" cy="20.37805577872145" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #72: 1.50min - Increase minimum lr and add max_seq_len </title></circle><circle cx="827.8947368421052" cy="20.309881785837256" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #73: 1.49min - Partitioned Hyperconnections</title></circle><circle cx="838.421052631579" cy="20.204521978652586" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #74: 1.47min - Flattened GPT forward, removed post atte</title></circle><circle cx="848.9473684210526" cy="20.11155744290141" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #75: 1.45min - Cross Entropy Kernel Optimizations</title></circle><circle cx="859.4736842105262" cy="20.068173992884194" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #76: 1.45min - Reuse and tune backward transpose kernel</title></circle><circle cx="870.0" cy="20.0" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #77: 1.44min - Replace partitioned hyperconnections wit</title></circle><text x="450.0" y="335" fill="#8b949e" font-size="12" text-anchor="middle">Record Number</text><text x="15" y="170.0" fill="#8b949e" font-size="12" text-anchor="middle" transform="rotate(-90,15,170.0)">Time (minutes)</text></svg></div>
+    <h3 style="color: var(--muted); margin: 1.5rem 0 0.5rem">Track 2: GPT-2 Medium</h3>
+    <div class="chart-container"><svg viewBox="0 0 900 340" class="chart-svg"><line x1="70" y1="20.0" x2="870" y2="20.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="24.0" fill="#8b949e" font-size="11" text-anchor="end">17.4m</text><line x1="70" y1="87.5" x2="870" y2="87.5" stroke="#30363d" stroke-width="0.5"/><text x="60" y="91.5" fill="#8b949e" font-size="11" text-anchor="end">100.0m</text><line x1="70" y1="155.0" x2="870" y2="155.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="159.0" fill="#8b949e" font-size="11" text-anchor="end">182.7m</text><line x1="70" y1="222.5" x2="870" y2="222.5" stroke="#30363d" stroke-width="0.5"/><text x="60" y="226.5" fill="#8b949e" font-size="11" text-anchor="end">265.3m</text><line x1="70" y1="290.0" x2="870" y2="290.0" stroke="#30363d" stroke-width="0.5"/><text x="60" y="294.0" fill="#8b949e" font-size="11" text-anchor="end">348.0m</text><path d="M70.0,290.0 L117.1,29.8 L164.1,28.8 L211.2,28.5 L258.2,28.0 L305.3,27.0 L352.4,26.5 L399.4,25.8 L446.5,25.5 L493.5,25.5 L540.6,25.0 L587.6,24.8 L634.7,24.7 L681.8,24.7 L728.8,24.6 L775.9,24.6 L822.9,24.6 L870.0,20.0" fill="none" stroke="#58a6ff" stroke-width="2"/><circle cx="70.0" cy="290.0" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #1: 348.00min - llm.c baseline (350M parameters)</title></circle><circle cx="117.05882352941177" cy="29.758052321185545" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #2: 29.30min - Initial record based on scaling up the G</title></circle><circle cx="164.11764705882354" cy="28.778164221986998" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #3: 28.10min - Added standard weight decay</title></circle><circle cx="211.1764705882353" cy="28.45153485558748" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #4: 27.70min - Tuned Muon Newton-Schulz coefficients</title></circle><circle cx="258.2352941176471" cy="28.04324814758808" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #5: 27.20min - Increased learning rate cooldown phase d</title></circle><circle cx="305.29411764705884" cy="27.022531377589594" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #6: 25.95min - 2x MLP wd, qkv norm, all_reduce/opt.step</title></circle><circle cx="352.3529411764706" cy="26.483592923030393" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #7: 25.29min - Remove FP8 head; ISRU logits softcap; Ne</title></circle><circle cx="399.4117647058823" cy="25.83849992439135" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #8: 24.50min - Cubic sliding window size schedule, 2× m</title></circle><circle cx="446.4705882352941" cy="25.52820202631181" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #9: 24.12min - Add two value embeddings</title></circle><circle cx="493.5294117647059" cy="25.48737335551187" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #10: 24.07min - Second input embedding</title></circle><circle cx="540.5882352941177" cy="24.981097837592618" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #11: 23.45min - Upgrade from torch 2.7 to torch==2.10.0.</title></circle><circle cx="587.6470588235294" cy="24.842280356872827" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #12: 23.28min - Snoo Optimizer (Outer optimizer around A</title></circle><circle cx="634.7058823529412" cy="24.727960078632996" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #13: 23.14min - EMA Wrapper on Muon</title></circle><circle cx="681.7647058823529" cy="24.678965673673066" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #14: 23.08min - Combine both records 12 &amp; 13</title></circle><circle cx="728.8235294117646" cy="24.63813700287313" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #15: 23.03min - Backout (Skip from 2/3 point to pre-lm_h</title></circle><circle cx="775.8823529411765" cy="24.605474066233175" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #16: 22.99min - Smear-MTP</title></circle><circle cx="822.9411764705882" cy="24.59730833207319" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #17: 22.98min - Remove Redundant Mask Op</title></circle><circle cx="870.0" cy="20.0" r="4" fill="#58a6ff" stroke="#0d1117" stroke-width="2"><title>Record #18: 17.35min - Bulk transfer short track features</title></circle><text x="450.0" y="335" fill="#8b949e" font-size="12" text-anchor="middle">Record Number</text><text x="15" y="170.0" fill="#8b949e" font-size="12" text-anchor="middle" transform="rotate(-90,15,170.0)">Time (minutes)</text></svg></div>
+</div>
+
+</div>
+
+<script>
+function showTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+}
+
+function toggleFilter(btn) {
+    const cat = btn.dataset.cat;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.record-card').forEach(card => {
+        if (cat === 'all') {
+            card.parentElement.style.display = '';
+        } else {
+            const cats = card.dataset.categories.split(' ');
+            card.parentElement.style.display = cats.includes(cat) ? '' : 'none';
+        }
+    });
+}
+</script>
+</body>
+</html>

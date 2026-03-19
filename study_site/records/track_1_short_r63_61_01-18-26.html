@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #61 — Unified Optimizers and Transposed LM Head | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #61
+        </div>
+        <div class="detail-title">#61: Unified Optimizers and Transposed LM Head</div>
+        <div class="detail-time">1.748 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-architecture">architecture</span><span class="badge badge-systems">systems</span>
+            <span style="color:var(--muted);margin-left:1rem">01/18/26</span>
+            <span style="color:var(--muted)">by @ChrisJMcCormick</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Unified optimizers and transposed LM head</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>Unifying Adam and Muon into a single optimizer loop reduces scheduling overhead. Transposing LM head enables more efficient matmul layout.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Optimizer unification</li><li>LM head transpose</li><li>Memory layout optimization</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>optimizer + systems</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #200: Unified Optimizers and Transposed LM Head</span>
+                <span class="diff-stats">
+                    <span class="add">+68571</span> / <span class="del">-1172</span> in 22 files
+                    — by @chrisjmccormick
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p><h1>Unified, Zero-Copy Optimizer and Transposed LM Head</h1>
+
+The main contributions of this record are:
+
+1. A combined and simplified optimizer, <code>NorMuonAndAdam</code>, oriented towards per-parameter rather than per-optimizer configuration.
+2. MLP and Attention parameter banks, allowing for a uniform workload across the gpus and eliminating all memcpys.
+3. A transposed memory layout for the LM head, which resolves the slow element-wise gradient accumulation kernel.
+
+I did my development against record 59. After integrating record 60 (logit softcap kernel) and re-timing I was able to remove another 5 steps (-10 steps total):
+``<code>
+                   Runs   Time μ  Time σ  Time +/-  Time p  Loss μ  Loss σ  Loss +/-      p
+baseline              8 105.5361  0.0923    0.0000     NaN  3.2783  0.0008    0.0000 0.0003 # At 1775 steps
+unified-optimizer     8 104.4579  0.1430   -1.0782  0.0000  3.2782  0.0015   -0.0001 0.0060 # At 1765 steps
+
+baseline:
+  losses = [3.2777, 3.2785, 3.2790, 3.2785, 3.2788, 3.2791, 3.2766, 3.2784]
+  times  = [105.3690, 105.5950, 105.4140, 105.5520, 105.5610, 105.5820, 105.6090, 105.6070]
+  (n = 8)
+
+unified-optimizer:
+  losses = [3.2781, 3.2803, 3.2767, 3.2799, 3.2794, 3.2767, 3.2767, 3.2780]
+  times  = [104.6490, 104.4420, 104.2430, 104.4540, 104.4860, 104.3220, 104.6550, 104.4120]
+  (n = 8)
+</code>`<code>
+
+Using record 59 (the MLP kernel) as baseline and reducing 5 steps:
+</code>`<code>
+                 Runs   Time μ  Time σ  Time +/-  Loss μ  Loss σ  Loss +/-      p
+Baseline            8 107.0998  0.0763    0.0000  3.2792  0.0017    0.0000 0.1039  # At 1775 steps
+unified-optimizer  10 106.4940  0.0245   -0.6058  3.2790  0.0006   -0.0001 0.0002  # At 1770 steps
+
+baseline:
+  losses = [3.2814, 3.2777, 3.2788, 3.2767, 3.2803, 3.2779, 3.2793, 3.2812]
+  times  = [107.1350, 107.1030, 107.0080, 107.2160, 107.0990, 107.0060, 107.0510, 107.1800]
+  (n = 8)
+
+unified-optimizer
+  losses = [3.2788, 3.2795, 3.2782, 3.2792, 3.2795, 3.2789, 3.2800, 3.2791, 3.2789, 3.2783]
+  times  = [106.4900, 106.4900, 106.5200, 106.4550, 106.5010, 106.4950, 106.5390, 106.4620, 106.5000, 106.4880]
+  (n = 10)
+</code>`<code>
+
+Notes:
+* I also included the </code>triton_kernels.py<code> change, and added a line at the top of train_gpt.py to pull the kernel code into the log file.
+* None of the changes in this PR should change the math or precision; however, they give a consistent reduction in loss (across multiple machines) which allowed for removing 5 steps relative to record 59.
+    * I believe I&#x27;ve narrowed the cause down to having replaced the gradient accumulation hooks with an explicit ordering of communication and optimizer work, but otherwise can&#x27;t explain it.
+
+
+<h2>1. Unified, Zero-Copy Optimizer</h2>
+
+<h3>1.1. Stacking vs. Sharding </h3>
+
+One of the core changes in this PR is the consolidation of the attention and mlp weight matrices into two &quot;parameter banks&quot;, which can be sharded across the GPUs, eliminating the need for stacking and unstacking during the optimizer window.
+
+<strong>Current Approach</strong>
+
+The approach to communicating the Muon parameters has been to:
+
+1. Assign different attention and MLP matrices to different GPUs.
+2. Assemble each GPU&#x27;s set of gradients by stacking them together.
+3. Scatter the stacks, do the Muon math, then gather the updates.
+4. Unstack the received updates and apply them to the local parameters.
+
+This approach has a few drawbacks:
+
+1. The stacking and unstacking operations require time-consuming memcpys, which have made it more difficult to fully overlap comms and compute (though a recent PR achieved it!).
+2. It relies on the attention weight matrices having the same size, shape, and orientation as the mlp weights.
+3. It runs in two passes, where the first pass works on all of the attention weights plus some of the MLP weights, and the second pass only works on the MLPs. The attention matrices are faster to process, but both passes are constrained by the length of the MLP work.
+
+This illustration is out-of-date, so ignore what it says about comms and compute delays, but it highlights the memcpys I&#x27;m referring to, and shows how time-consuming they are.
+
+!<a href="https://raw.githubusercontent.com/KellerJordan/modded-nanogpt/fade5106e85bb618e9b39d3f1d43fe63f8f38956/records/track_1_short/2026-01-18_UnifiedOptimizers/gradient_stacking_and_unstacking.png" target="_blank">Illustration of GPU trace showing the gradient stacking and update unstacking</a>
+
+<strong>Parameter Banks</strong>
+
+This PR utilitizes a &quot;parameter bank&quot; strategy that was introduced in a previous PR for the attention gates and ve gates, and I&#x27;ve extended it to the attention and mlp projection matrices.
+
+The QKVO weight matrices from all 10 attention modules are stored as a single parameter of shape </code>(10, 4×768, 768)<code>. This can be &#x27;reshaped&#x27; without memory movement to </code>(40, 768, 768)<code>, and then sharded evenly across the 8 GPUs (so that each gets five attention matrices). 
+
+The MLP weight matrices (11 modules, 2 matrices per module) require padding to be sharded evenly. Their parameter bank is </code>(12, 2, 3072)<code>, and this is &quot;reshaped&quot; to </code>(24, 3072)<code> so that each GPU receives 3 matrices to process.
+
+Note that means we&#x27;re paying the communication and optimizer overhead for an entire additional MLP, so we may be able to find a use for those weights. There are some notes on what I tried under the <strong>Ideas</strong> section. 
+
+Now, both passes have balanced workloads, and:
+* The first pass should be significantly faster than before, with each GPU working only on attention weights, and only </code>(5, 768, 768)<code> each. 
+* The second pass will be slower than before, with each GPU now working on 3 MLP matrices instead of two.
+
+<h3>1.2. Individual Parameters</h3>
+
+An additional benefit of the parameter banks is that it helps eliminate the need for the concept of &quot;parameter groups&quot;.
+
+Optimizer groups exist to handle the fact that we typically have multiple instances of the same functional matrix--e.g., we have 10 layers worth of attention weights--which all share settings like learning rate.
+
+Groups add an additional layer of abstraction and complexity to the optimizer code. With the parameter banks, our model no longer has per-layer parameters, and instead has &quot;only&quot; the 13 distinct parameters in the table below (defined in the </code>TrainingManager<code> init function).
+
+</code>`<code>python
+<h1>- Ordering dictates when to launch reduce/reduce_scatter operations</h1>
+<h1>- &quot;sharded&quot; parameters use reduce_scatter/all_gather and &quot;replicated&quot; ones use all_reduce</h1>
+self.param_table = {
+    &quot;attn&quot;:           {&quot;optim&quot;: &quot;normuon&quot;, &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: None},
+    &quot;mlp&quot;:            {&quot;optim&quot;: &quot;normuon&quot;, &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: None},         
+    &quot;scalars&quot;:        {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.9,  0.99]},
+    &quot;ve0&quot;:            {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: [0.75, 0.95]},
+    &quot;ve1&quot;:            {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: [0.75, 0.95]},
+    &quot;ve2&quot;:            {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: [0.75, 0.95]},
+    &quot;smear_gate&quot;:     {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.9,  0.99]},
+    &quot;skip_gate&quot;:      {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.9,  0.99]},
+    &quot;attn_gate_bank&quot;: {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.9,  0.99]},
+    &quot;ve_gate_bank&quot;:   {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.9,  0.99]},
+    &quot;x0_lambdas&quot;:     {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;replicated&quot;,  &quot;adam_betas&quot;: [0.65, 0.95]},
+    &quot;lm_head&quot;:        {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: [0.5,  0.95]}, # Before embed for grad aggregation
+    &quot;embed&quot;:          {&quot;optim&quot;: &quot;adam&quot;,    &quot;comms&quot;: &quot;sharded&quot;,     &quot;adam_betas&quot;: [0.5,  0.95]}, # Last (skipped when tied)
+}
+</code>`<code>
+
+The one remaining set of components that could arguably still be grouped are the value embedding tables. Instead, I&#x27;ve individually labeled them as &#x27;ve0&#x27;, &#x27;ve1&#x27;, and &#x27;ve2&#x27; to treat them as distinct parameters.
+
+<h3>1.3. Replacing Hooks with Explicit Ordering</h3>
+
+The most substantial benefit we were getting from registering gradient accumulation hooks was to overlap communication with the lengthy lm_head gradient accumulation kernel. With that removed (as described further down), there&#x27;s less benefit to overlapping the smaller kernels, and I chose to remove the feature for simplicity and added flexibility in ordering the communication and workload.
+
+The order of the parameters in the above </code>param_table<code> dictates the order in which we issue the scatter or all_reduce operations, and then a separate list specifies the order that we work on them:
+
+</code>`<code>python
+<h1>- Process smaller/faster params first while large reduces complete</h1>
+<h1>- lm_head must complete before embed sync (when tied)</h1>
+self.work_order = [
+    &quot;scalars&quot;, &quot;smear_gate&quot;, &quot;skip_gate&quot;, &quot;attn_gate_bank&quot;, &quot;ve_gate_bank&quot;, &quot;x0_lambdas&quot;,  # Small, fast
+    &quot;ve0&quot;, &quot;ve1&quot;, &quot;ve2&quot;,  # Medium
+    &quot;lm_head&quot;, &quot;embed&quot;,   # lm_head must complete before embed sync (when tied)
+    &quot;attn&quot;, &quot;mlp&quot;,        # Large, polar express - process last to maximize overlap
+]
+</code>`<code>
+
+This ordering was chosen by Claude Opus, and the comments are its&#x27; rationale. This strategy outperforms the prior hook approach and appears to be responsible for the reduction in validation loss that allowed me to remove 5 steps.
+
+I think the rationale for the work order makes sense, but note how its roughly the opposite of the communication order--that part seems counterintuitive to me.
+
+<h3>1.4. Debugging Comms</h3>
+
+I&#x27;ve been having issues lately with getting good trace data. The profiler is somehow slowing things down much more than usual, and the communication data in particular doesn&#x27;t look right. This has made it hard to arrive on a deliberate strategy and validate it.
+
+In other words, I can&#x27;t rationalize / confirm that the current communication and work strategy is optimal. It would even make sense for there to exist a hook-based solution that outperforms this one. This PR is very much &quot;for whatever reason, this works better than what we had&quot;.
+
+Just for future reference, I&#x27;ve printed out the order that the hooks were firing in, which tells us what order gradient accumulation happens in, and which in turn may have some value in understanding communication behavior.
+
+Note: To include the NorMuon parameters as well, I added hooks to them and manually set the gradient accumulation steps to 2 so that they would trigger.
+
+Here&#x27;s the order they&#x27;re called in:
+
+1. scalars
+2. embed
+3. smear_gate
+4. lm_head
+5. skip_gate
+6. mlp
+7. attn
+8. ve_gate_bank
+9. ve2
+10. attn_gate_bank
+11. ve1
+12. x0_lambdas
+13. ve0
+
+Not very intuitive!
+
+<h2>2. Transposed LM-Head</h2>
+
+Another long-standing communications issue has been the slow gradient accumulation kernel for the LM head. 
+
+The below illustrations are from an older baseline, but highlight the problem well.
+
+In the Adam plus Muon steps:
+
+!<a href="https://raw.githubusercontent.com/KellerJordan/modded-nanogpt/fade5106e85bb618e9b39d3f1d43fe63f8f38956/records/track_1_short/2026-01-18_UnifiedOptimizers/lm_head-backward-kernel.png" target="_blank">Illustration of GPU trace showing the cost of the LM head gradient accumulation kernel</a>
+
+In the Muon-only steps:
+
+!<a href="https://raw.githubusercontent.com/KellerJordan/modded-nanogpt/fade5106e85bb618e9b39d3f1d43fe63f8f38956/records/track_1_short/2026-01-18_UnifiedOptimizers/lm_head_grad_accum_in_muon_step.png" target="_blank">Illustration of GPU trace showing the cost of the LM head gradient accumulation kernel</a>
+
+I&#x27;ve resolved this by transposing the memory layout of the LM head so that it now has shape (768, 50304), and updated the FP8 implementation to support this. From test runs and looking at single GPU trace files, it appears to have identical forward/backward performance to the current implementation.
+
+Here&#x27;s what was behind the slow kernel, and how transposing addresses it.
+
+<h3>2.1. Mismatched Memory Layouts</h3>
+
+Currently, the backward pass produces gradients for the LM head with layout (768, 50304), but the head is stored as (50304, 768).
+
+I&#x27;ve learned that, while CUDA can often hide the cost of mismatched memory layouts when performing matrix multiplications, it&#x27;s not possible to hide this problem for element-wise operations.
+
+This is because values can be read once and used multiple times in matmul, but for element-wise operations each value is read and used exactly once. When the memory layouts don&#x27;t match, it has to stride through one of the matrices, resulting in kernels that run substantially slower.
+
+This is the reason for the slowness of the current gradient accumulation kernel, which takes maybe 4x longer than the other embedding tables despite being the same size and shape.
+
+Transposing the head brings the weights and gradients into alignment. This has the biggest impact for the NorMuon-only steps, where we&#x27;ve never been able to overlap any communication with the slower kernel.
+
+<h3>2.2. Tied Embeddings</h3>
+
+This change was more clearly beneficial back before we re-tied the embeddings. The tied embeddings create a problem--the input embeddings _still need_ to have their current shape of </code>(50304, 768)<code> so that the embeddings are laid out consecutively in memory and can be selected efficiently.
+
+To resolve this, I &quot;untied the embeddings&quot; in the sense that there are now always two separate matrices involved, but they&#x27;re kept effectively tied by managing their gradients and updates manually. 
+
+This means manually combining the LM head and input embedding gradients before scattering them, and then copying the received updates into both the </code>embed<code> and </code>lm_head<code> weights.
+
+This actually brings us back where we started--expensive elementwise operations on two misaligned matrices--but now it&#x27;s inside of the optimizer step code where there&#x27;s plenty of compute available and we have the ability to overlap it with comms. 
+
+<h3>2.3. Optimizer State After Untying</h3>
+
+An additional challenge was setting up the optimizer state for the </code>embed<code> matrix at the untie point. Because of the difference in orientation, each GPU handles a </code>(96, 50304)<code> shard of </code>lm_head<code> and a </code>(6288, 768)<code> shard of </code>embed<code>. That means we can&#x27;t simply copy the Adam momentum buffers from one to the other. 
+
+Thank you to @ClassicLarry for suggesting a more straightforward solution to this than what I had been trying. We simply perform an explicit communication step to make sure every GPU has the correct momentum buffer state for </code>embed<code>. This preserves the behavior and accuracy of the existing implementation.
+
+<h2>Ideas</h2>
+
+With the Muon memcpys gone, we have quite a lot of compute available during the optimizer window. Here are a few things I played with that might deserve exploring more, or might spark other ideas.
+
+<h3>Interpolated Embedding Updates</h3>
+
+Because we&#x27;re now manually combining the gradient updates of the input embeddings and LM heads to tie them, we have the opportunity to &quot;mix&quot; them differently; i.e., we could scale the input embedding gradients up or down relative to the lm_head before combining them. 
+
+<h3>Blending / Switching Muon and Adam</h3>
+
+Adam is remarkably fast, and I think we can afford to run both NorMuon and Adam on the MLP and Attention weights at the same time. I tried some experiments blending their updates over the course of training, but nothing looked promising.
+
+What I&#x27;d still be interested to try, though, is switching the projection matrices from Muon to Adam towards the very end. Compared to Muon&#x27;s orthogonalization constraint, I&#x27;m wondering if the per-parameter freedom of Adam&#x27;s updates might allow it to settle into a better local optimum (or find one faster) at the end of training.
+
+(Larry has some interesting notes on this idea in the comments of the PR)
+
+<h3>Starting </code>forward<code> Within </code>step<code></h3>
+
+It&#x27;s not a giant time savings, but inside of the optimizer window, while still waiting for the attention and MLP gathers to complete, we can start selecting the next input embeddings, normalizing them, applying the smear gate, and perhaps even running the first attention layer (since those weights arrive before the MLPs).
+
+I started on this, but set it aside when I realized how complicated / impossible it would be when doing gradient accumulation steps. 
+
+I think the solution there would probably be to define a separate training loop that&#x27;s only for the 8x gpu setup (with no gradient accumulation support), where we could apply this.
+
+<h3>Leveraging the Spare MLP Weights</h3>
+
+We are now paying the communication and optimizer overhead for another MLP&#x27;s worth of weights. 
+
+One idea I tried for taking advantage of this was to use one of those spare matrices to serve as the QKVO weights to restore attention layer 6.
+
+Because this matrix is optimized with the MLP weights, Muon treats it as one big matrix instead of four separate ones. Not ideal, but it still works.
+
+It seemed promising, with some very low loss values: </code>[3.2740, 3.2722, 3.2733, 3.2758]<code>
+
+However, it takes about 50 steps to break even, and the loss was far too high (row 4 below).
+
+I tried both with and without the skip connection (which seems like it may be serving some of the role of the missing attention layer?):
+
+</code>`<code>
+                            Runs   Time μ  Time σ  Time +/-  Loss μ  Loss σ  Loss +/-      p
+This Record                   10 106.4940  0.0245    0.0000  3.2790  0.0006    0.0000 0.0002
+Restore Attn 6, remove skip    4 109.3678  0.0814    2.8738  3.2754  0.0011   -0.0036 0.0017
+Restore Attn 6, keep skip      4 109.5280  0.0281    3.0340  3.2738  0.0015   -0.0052 0.0019
+Above, minus 50 steps          8 106.4315  0.0485   -0.0625  3.2816  0.0012    0.0026 0.9964
+</code>``
+
+Maybe with the right adjustments to the skip connection, or other attention attributes, it could work?</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #200)</span>
+                    <span>1 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[A] triton_kernels.py</span>
+                        <span class="diff-stats"><span class="add">+532</span> <span class="del">-0</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -0,0 +1,532 @@</span>
+<span class="diff-add">+import torch</span>
+<span class="diff-add">+import triton</span>
+<span class="diff-add">+import triton.language as tl</span>
+<span class="diff-add">+from triton.tools.tensor_descriptor import TensorDescriptor</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+# -----------------------------------------------------------------------------</span>
+<span class="diff-add">+# Triton kernel for symmetric matrix multiplication by @byronxu99</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def _get_autotune_configs():</span>
+<span class="diff-add">+    return [</span>
+<span class="diff-add">+        triton.Config(</span>
+<span class="diff-add">+            {</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_M&quot;: bm,</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_N&quot;: bn,</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_K&quot;: bk,</span>
+<span class="diff-add">+                &quot;GROUP_SIZE_M&quot;: 8,</span>
+<span class="diff-add">+                &quot;LOWER_UPPER&quot;: 1,</span>
+<span class="diff-add">+            },</span>
+<span class="diff-add">+            num_stages=stages,</span>
+<span class="diff-add">+            num_warps=warps,</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        for bm in [64, 128]</span>
+<span class="diff-add">+        for bn in [64, 128, 256]</span>
+<span class="diff-add">+        for bk in [64, 128]</span>
+<span class="diff-add">+        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span>
+<span class="diff-add">+        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span>
+<span class="diff-add">+    ]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def _pid_to_block(</span>
+<span class="diff-add">+    pid,</span>
+<span class="diff-add">+    M,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Map PID to a single matrix in batch</span>
+<span class="diff-add">+    batch_idx = pid // (num_pid_m * num_pid_n)</span>
+<span class="diff-add">+    pid = pid % (num_pid_m * num_pid_n)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Map PID to 2D grid of blocks</span>
+<span class="diff-add">+    pid_m = pid // num_pid_n</span>
+<span class="diff-add">+    pid_n = pid % num_pid_n</span>
+<span class="diff-add">+    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    m_idx = pid_m * BLOCK_SIZE_M</span>
+<span class="diff-add">+    n_idx = pid_n * BLOCK_SIZE_N</span>
+<span class="diff-add">+    return batch_idx, m_idx, n_idx</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.autotune(</span>
+<span class="diff-add">+    configs=_get_autotune_configs(),</span>
+<span class="diff-add">+    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span>
+<span class="diff-add">+)</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def XXT_kernel(</span>
+<span class="diff-add">+    A_ptr, C_ptr,</span>
+<span class="diff-add">+    M, K,</span>
+<span class="diff-add">+    a_stride_b, a_stride_r, a_stride_c,</span>
+<span class="diff-add">+    c_stride_b, c_stride_r, c_stride_c,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_K: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    LOWER_UPPER: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    pid = tl.program_id(axis=0)</span>
+<span class="diff-add">+    batch_idx, m_idx, n_idx = _pid_to_block(</span>
+<span class="diff-add">+        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Skip blocks that don&#x27;t need to be computed</span>
+<span class="diff-add">+    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span>
+<span class="diff-add">+    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span>
+<span class="diff-add">+    if skip_block_below_diag or skip_block_above_diag:</span>
+<span class="diff-add">+        return</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Index into one matrix of batch</span>
+<span class="diff-add">+    A_ptr += batch_idx * a_stride_b</span>
+<span class="diff-add">+    C_ptr += batch_idx * c_stride_b</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Create pointer arrays for A and A.T</span>
+<span class="diff-add">+    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span>
+<span class="diff-add">+    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span>
+<span class="diff-add">+    offs_k = tl.arange(0, BLOCK_SIZE_K)</span>
+<span class="diff-add">+    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span>
+<span class="diff-add">+    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Accumulate over blocks of K</span>
+<span class="diff-add">+    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span>
+<span class="diff-add">+        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        accumulator = tl.dot(a, at, accumulator)</span>
+<span class="diff-add">+        a_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+        at_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    out_dtype = C_ptr.dtype.element_ty</span>
+<span class="diff-add">+    output = accumulator.to(out_dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C</span>
+<span class="diff-add">+    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs, output, mask=c_mask)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C mirrored across the diagonal</span>
+<span class="diff-add">+    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def XXT(A: torch.Tensor, out: torch.Tensor):</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    Launch Triton kernel to compute C = A @ A.T</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    assert A.ndim == 2 or A.ndim == 3</span>
+<span class="diff-add">+    M, K = A.shape[-2:]</span>
+<span class="diff-add">+    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span>
+<span class="diff-add">+    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    batch_size = A.size(0) if A.ndim == 3 else 1</span>
+<span class="diff-add">+    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span>
+<span class="diff-add">+    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    grid = lambda meta: (</span>
+<span class="diff-add">+        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    XXT_kernel[grid](</span>
+<span class="diff-add">+        A_ptr=A,</span>
+<span class="diff-add">+        C_ptr=out,</span>
+<span class="diff-add">+        M=M,</span>
+<span class="diff-add">+        K=K,</span>
+<span class="diff-add">+        a_stride_b=input_batch_stride,</span>
+<span class="diff-add">+        a_stride_r=A.stride(-2),</span>
+<span class="diff-add">+        a_stride_c=A.stride(-1),</span>
+<span class="diff-add">+        c_stride_b=output_batch_stride,</span>
+<span class="diff-add">+        c_stride_r=out.stride(-2),</span>
+<span class="diff-add">+        c_stride_c=out.stride(-1),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    return out</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.autotune(</span>
+<span class="diff-add">+    configs=_get_autotune_configs(),</span>
+<span class="diff-add">+    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span>
+<span class="diff-add">+)</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def ba_plus_cAA_kernel(</span>
+<span class="diff-add">+    A_ptr, C_ptr,</span>
+<span class="diff-add">+    M,</span>
+<span class="diff-add">+    a_stride_b, a_stride_r, a_stride_c,</span>
+<span class="diff-add">+    c_stride_b, c_stride_r, c_stride_c,</span>
+<span class="diff-add">+    alpha, beta,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_K: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    LOWER_UPPER: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    # This is mostly duplicated from XXT_kernel, but also loads and adds a block of A</span>
+<span class="diff-add">+    # Performance is slightly slower than XXT_kernel, so we use two separate kernels</span>
+<span class="diff-add">+    pid = tl.program_id(axis=0)</span>
+<span class="diff-add">+    batch_idx, m_idx, n_idx = _pid_to_block(</span>
+<span class="diff-add">+        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Skip blocks that don&#x27;t need to be computed</span>
+<span class="diff-add">+    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span>
+<span class="diff-add">+    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span>
+<span class="diff-add">+    if skip_block_below_diag or skip_block_above_diag:</span>
+<span class="diff-add">+        return</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Index into one matrix of batch</span>
+<span class="diff-add">+    A_ptr += batch_idx * a_stride_b</span>
+<span class="diff-add">+    C_ptr += batch_idx * c_stride_b</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Create pointer arrays for A and A.T</span>
+<span class="diff-add">+    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span>
+<span class="diff-add">+    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span>
+<span class="diff-add">+    offs_k = tl.arange(0, BLOCK_SIZE_K)</span>
+<span class="diff-add">+    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span>
+<span class="diff-add">+    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Accumulate over blocks of K</span>
+<span class="diff-add">+    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span>
+<span class="diff-add">+        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        accumulator = tl.dot(a, at, accumulator)</span>
+<span class="diff-add">+        a_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+        at_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Load block of A to add (corresponds to the current block of C)</span>
+<span class="diff-add">+    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span>
+<span class="diff-add">+    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span>
+<span class="diff-add">+    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Apply alpha and beta</span>
+<span class="diff-add">+    accumulator *= alpha</span>
+<span class="diff-add">+    accumulator += a_add * beta</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    out_dtype = C_ptr.dtype.element_ty</span>
+<span class="diff-add">+    output = accumulator.to(out_dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C</span>
+<span class="diff-add">+    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs, output, mask=c_mask)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C mirrored across the diagonal</span>
+<span class="diff-add">+    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def ba_plus_cAA(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    assert A.ndim == 2 or A.ndim == 3</span>
+<span class="diff-add">+    M, K = A.shape[-2:]</span>
+<span class="diff-add">+    assert M == K, &quot;Input matrix must be square&quot;</span>
+<span class="diff-add">+    assert out.size(-2) == M</span>
+<span class="diff-add">+    assert out.size(-1) == M</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    batch_size = A.size(0) if A.ndim == 3 else 1</span>
+<span class="diff-add">+    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span>
+<span class="diff-add">+    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    grid = lambda meta: (</span>
+<span class="diff-add">+        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    ba_plus_cAA_kernel[grid](</span>
+<span class="diff-add">+        A_ptr=A,</span>
+<span class="diff-add">+        C_ptr=out,</span>
+<span class="diff-add">+        M=M,</span>
+<span class="diff-add">+        a_stride_b=input_batch_stride,</span>
+<span class="diff-add">+        a_stride_r=A.stride(-2),</span>
+<span class="diff-add">+        a_stride_c=A.stride(-1),</span>
+<span class="diff-add">+        c_stride_b=output_batch_stride,</span>
+<span class="diff-add">+        c_stride_r=out.stride(-2),</span>
+<span class="diff-add">+        c_stride_c=out.stride(-1),</span>
+<span class="diff-add">+        alpha=alpha,</span>
+<span class="diff-add">+        beta=beta,</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    return out</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+# -----------------------------------------------------------------------------</span>
+<span class="diff-add">+# Triton kernel for MLP: relu(x @ W1.T)^2, by @andrewbriand, @jrauvola</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def linear_relu_square_kernel(a_desc, b_desc, c_desc, aux_desc,</span>
+<span class="diff-add">+                                 M, N, K,</span>
+<span class="diff-add">+                                 BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+                                 BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+                                 BLOCK_SIZE_K: tl.constexpr,</span>
+<span class="diff-add">+                                 GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+                                 NUM_SMS: tl.constexpr,</span>
+<span class="diff-add">+                                 FORWARD: tl.constexpr,</span>
+<span class="diff-add">+                                 ):</span>
+<span class="diff-add">+    dtype = tl.bfloat16</span>
+<span class="diff-add">+    start_pid = tl.program_id(axis=0)</span>
+<span class="diff-add">+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    k_tiles = tl.cdiv(K, BLOCK_SIZE_K)</span>
+<span class="diff-add">+    num_tiles = num_pid_m * num_pid_n</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    tile_id_c = start_pid - NUM_SMS</span>
+<span class="diff-add">+    num_pid_in_group = GROUP_SIZE_M * num_pid_n</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    for tile_id in tl.range(start_pid, num_tiles, NUM_SMS, flatten=True):</span>
+<span class="diff-add">+        pid_m = tile_id // num_pid_n</span>
+<span class="diff-add">+        pid_n = tile_id % num_pid_n</span>
+<span class="diff-add">+        offs_am = pid_m * BLOCK_SIZE_M</span>
+<span class="diff-add">+        offs_bn = pid_n * BLOCK_SIZE_N</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span>
+<span class="diff-add">+        for ki in range(k_tiles):</span>
+<span class="diff-add">+            offs_k = ki * BLOCK_SIZE_K</span>
+<span class="diff-add">+            a = a_desc.load([offs_am, offs_k])</span>
+<span class="diff-add">+            b = b_desc.load([offs_bn, offs_k])</span>
+<span class="diff-add">+            accumulator = tl.dot(a, b.T, accumulator)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        tile_id_c += NUM_SMS</span>
+<span class="diff-add">+        pid_m = tile_id // num_pid_n</span>
+<span class="diff-add">+        pid_n = tile_id % num_pid_n</span>
+<span class="diff-add">+        offs_am_c = pid_m * BLOCK_SIZE_M</span>
+<span class="diff-add">+        offs_bn_c = pid_n * BLOCK_SIZE_N</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        acc = tl.reshape(accumulator, (BLOCK_SIZE_M, 2, BLOCK_SIZE_N // 2))</span>
+<span class="diff-add">+        acc = tl.permute(acc, (0, 2, 1))</span>
+<span class="diff-add">+        acc0, acc1 = tl.split(acc)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        c0 = acc0.to(dtype)</span>
+<span class="diff-add">+        if not FORWARD:</span>
+<span class="diff-add">+            c0_pre = aux_desc.load([offs_am_c, offs_bn_c])</span>
+<span class="diff-add">+            c0 = 2 * c0 * tl.where(c0_pre &gt; 0, c0_pre, 0)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        c_desc.store([offs_am_c, offs_bn_c], c0)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        if FORWARD:</span>
+<span class="diff-add">+            c0_post = tl.maximum(c0, 0)</span>
+<span class="diff-add">+            c0_post = c0_post * c0_post</span>
+<span class="diff-add">+            aux_desc.store([offs_am_c, offs_bn_c], c0_post)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        c1 = acc1.to(dtype)</span>
+<span class="diff-add">+        if not FORWARD:</span>
+<span class="diff-add">+            c1_pre = aux_desc.load([offs_am_c, offs_bn_c + BLOCK_SIZE_N // 2])</span>
+<span class="diff-add">+            c1 = 2 * c1 * tl.where(c1_pre &gt; 0, c1_pre, 0)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        c_desc.store([offs_am_c, offs_bn_c + BLOCK_SIZE_N // 2], c1)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        if FORWARD:</span>
+<span class="diff-add">+            c1_post = tl.maximum(c1, 0)</span>
+<span class="diff-add">+            c1_post = c1_post * c1_post</span>
+<span class="diff-add">+            aux_desc.store([offs_am_c, offs_bn_c + BLOCK_SIZE_N // 2], c1_post)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def linear_relu_square(a, b, aux=None):</span>
+<span class="diff-add">+    M, K = a.shape</span>
+<span class="diff-add">+    N, K = b.shape</span>
+<span class="diff-add">+    dtype = a.dtype</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    c = torch.empty((M, N), device=a.device, dtype=dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    FORWARD = False</span>
+<span class="diff-add">+    if aux is None:</span>
+<span class="diff-add">+        FORWARD = True</span>
+<span class="diff-add">+        aux = torch.empty((M, N), device=a.device, dtype=dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    NUM_SMS = torch.cuda.get_device_properties(&quot;cuda&quot;).multi_processor_count</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    BLOCK_SIZE_M = 128</span>
+<span class="diff-add">+    BLOCK_SIZE_N = 256</span>
+<span class="diff-add">+    BLOCK_SIZE_K = 64</span>
+<span class="diff-add">+    num_stages = 4 if FORWARD else 3</span>
+<span class="diff-add">+    num_warps = 8</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    a_desc = TensorDescriptor.from_tensor(a, [BLOCK_SIZE_M, BLOCK_SIZE_K])</span>
+<span class="diff-add">+    b_desc = TensorDescriptor.from_tensor(b, [BLOCK_SIZE_N, BLOCK_SIZE_K])</span>
+<span class="diff-add">+    c_desc = TensorDescriptor.from_tensor(c, [BLOCK_SIZE_M, BLOCK_SIZE_N // 2])</span>
+<span class="diff-add">+    aux_desc = TensorDescriptor.from_tensor(aux, [BLOCK_SIZE_M, BLOCK_SIZE_N // 2])</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    def grid(META):</span>
+<span class="diff-add">+        return (min(</span>
+<span class="diff-add">+            NUM_SMS,</span>
+<span class="diff-add">+            triton.cdiv(M, BLOCK_SIZE_M) * triton.cdiv(N, BLOCK_SIZE_N),</span>
+<span class="diff-add">+        ), )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    linear_relu_square_kernel[grid](</span>
+<span class="diff-add">+        a_desc, b_desc, c_desc, aux_desc,</span>
+<span class="diff-add">+        M, N, K,</span>
+<span class="diff-add">+        BLOCK_SIZE_M=BLOCK_SIZE_M,</span>
+<span class="diff-add">+        BLOCK_SIZE_N=BLOCK_SIZE_N,</span>
+<span class="diff-add">+        BLOCK_SIZE_K=BLOCK_SIZE_K,</span>
+<span class="diff-add">+        GROUP_SIZE_M=1,</span>
+<span class="diff-add">+        NUM_SMS=NUM_SMS,</span>
+<span class="diff-add">+        FORWARD=FORWARD,</span>
+<span class="diff-add">+        num_stages=num_stages,</span>
+<span class="diff-add">+        num_warps=num_warps</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    if FORWARD:</span>
+<span class="diff-add">+        return c, aux</span>
+<span class="diff-add">+    else:</span>
+<span class="diff-add">+        return c</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+class FusedLinearReLUSquareFunction(torch.autograd.Function):</span>
+<span class="diff-add">+    @staticmethod</span>
+<span class="diff-add">+    def forward(ctx, x, W1, W2):</span>
+<span class="diff-add">+        pre, post = linear_relu_square(x.view((-1, x.shape[-1])), W1)</span>
+<span class="diff-add">+        x3 = post @ W2</span>
+<span class="diff-add">+        ctx.save_for_backward(x, W1, W2, pre, post)</span>
+<span class="diff-add">+        return x3.view(x.shape)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    @staticmethod</span>
+<span class="diff-add">+    def backward(ctx, grad_output):</span>
+<span class="diff-add">+        x, W1, W2, pre, post = ctx.saved_tensors</span>
+<span class="diff-add">+        dW2 = post.T @ grad_output</span>
+<span class="diff-add">+        dpre = linear_relu_square(grad_output.view((-1, grad_output.shape[-1])), W2, aux=pre)</span>
+<span class="diff-add">+        dW1 = dpre.T @ x</span>
+<span class="diff-add">+        dx = dpre @ W1</span>
+<span class="diff-add">+        return dx.view(x.shape), dW1, dW2</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+# -----------------------------------------------------------------------------</span>
+<span class="diff-add">+# Fused Softcapped Cross Entropy</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def fused_softcapped_entropy_fwd_kernel(</span>
+<span class="diff-add">+    logits_ptr, losses_ptr, lse_ptr, targets_ptr, mtp_weights_ptr,</span>
+<span class="diff-add">+    stride_logits_n, stride_logits_v,</span>
+<span class="diff-add">+    n_rows, n_cols, n_predict,</span>
+<span class="diff-add">+    A, B, C,</span>
+<span class="diff-add">+    BLOCK_SIZE: tl.constexpr</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    row_idx = tl.program_id(0).to(tl.int64)</span>
+<span class="diff-add">+    logits_row_ptr = logits_ptr + row_idx * stride_logits_n</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    max_val = -float(&#x27;inf&#x27;)</span>
+<span class="diff-add">+    sum_exp = 0.0</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    for off in range(0, n_cols, BLOCK_SIZE):</span>
+<span class="diff-add">+        cols = off + tl.arange(0, BLOCK_SIZE)</span>
+<span class="diff-add">+        mask = cols &lt; n_cols</span>
+<span class="diff-add">+        val = tl.load(logits_row_ptr + cols, mask=mask, other=-float(&#x27;inf&#x27;)).to(tl.float32)</span>
+<span class="diff-add">+        z = A * tl.sigmoid((val + B) / C)</span>
+<span class="diff-add">+        z = tl.where(mask, z, -float(&#x27;inf&#x27;))</span>
+<span class="diff-add">+        curr_max = tl.max(z, axis=0)</span>
+<span class="diff-add">+        new_max = tl.maximum(max_val, curr_max)</span>
+<span class="diff-add">+        sum_exp = sum_exp * tl.exp(max_val - new_max) + tl.sum(tl.exp(z - new_max), axis=0)</span>
+<span class="diff-add">+        max_val = new_max</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    lse = max_val + tl.log(sum_exp)</span>
+<span class="diff-add">+    tl.store(lse_ptr + row_idx, lse)</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    total_loss = 0.0</span>
+<span class="diff-add">+    for k in range(n_predict):</span>
+<span class="diff-add">+        target_idx = row_idx + k</span>
+<span class="diff-add">+        if target_idx &lt; n_rows:</span>
+<span class="diff-add">+            weight = tl.load(mtp_weights_ptr + k)</span>
+<span class="diff-add">+            if weight &gt; 0:</span>
+<span class="diff-add">+                target = tl.load(targets_ptr + target_idx).to(tl.int32)</span>
+<span class="diff-add">+                if target &gt;= 0 and target &lt; n_cols:</span>
+<span class="diff-add">+                    val_target = tl.load(logits_row_ptr + target).to(tl.float32)</span>
+<span class="diff-add">+                    z_target = A * tl.sigmoid((val_target + B) / C)</span>
+<span class="diff-add">+                    total_loss += weight * (lse - z_target)</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    tl.store(losses_ptr + row_idx, total_loss)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def fused_softcapped_entropy_bwd_kernel(</span>
+<span class="diff-add">+    grad_input_ptr, grad_output_ptr, lse_ptr, logits_ptr, targets_ptr, mtp_weights_ptr,</span>
+<span class="diff-add">+    stride_logits_n, stride_logits_v, stride_grad_n, stride_grad_v,</span>
+<span class="diff-add">+    n_rows, n_cols, n_predict,</span>
+<span class="diff-add">+    A, B, C,</span>
+<span class="diff-add">+    BLOCK_SIZE: tl.constexpr</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    row_idx = tl.program_id(0).to(tl.int64)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    logits_row_ptr = logits_ptr + row_idx * stride_logits_n</span>
+<span class="diff-add">+    grad_row_ptr = grad_input_ptr + row_idx * stride_grad_n</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    lse = tl.load(lse_ptr + row_idx)</span>
+<span class="diff-add">+    grad_loss = tl.load(grad_output_ptr + row_idx)</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    S_w = 0.0</span>
+<span class="diff-add">+    for k in range(n_predict):</span>
+<span class="diff-add">+        if row_idx + k &lt; n_rows:</span>
+<span class="diff-add">+            S_w += tl.load(mtp_weights_ptr + k)</span>
+<span class="diff-add">+            </span>
+<span class="diff-add">+    for off in range(0, n_cols, BLOCK_SIZE):</span>
+<span class="diff-add">+        cols = off + tl.arange(0, BLOCK_SIZE)</span>
+<span class="diff-add">+        mask = cols &lt; n_cols</span>
+<span class="diff-add">+        val = tl.load(logits_row_ptr + cols, mask=mask, other=0.0).to(tl.float32)</span>
+<span class="diff-add">+        u = (val + B) / C</span>
+<span class="diff-add">+        sigmoid_u = tl.sigmoid(u)</span>
+<span class="diff-add">+        z = A * sigmoid_u</span>
+<span class="diff-add">+        p = tl.exp(z - lse)</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        term1 = S_w * p</span>
+<span class="diff-add">+        term2 = tl.zeros([BLOCK_SIZE], dtype=tl.float32)</span>
+<span class="diff-add">+        for k in range(n_predict):</span>
+<span class="diff-add">+            if row_idx + k &lt; n_rows:</span>
+<span class="diff-add">+                target = tl.load(targets_ptr + row_idx + k).to(tl.int32)</span>
+<span class="diff-add">+                weight = tl.load(mtp_weights_ptr + k)</span>
+<span class="diff-add">+                term2 += tl.where(cols == target, weight, 0.0)</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        grad_z = grad_loss * (term1 - term2)</span>
+<span class="diff-add">+        dz_dx = (1.0 / C) * z * (1.0 - sigmoid_u)</span>
+<span class="diff-add">+        grad_x = grad_z * dz_dx</span>
+<span class="diff-add">+        tl.store(grad_row_ptr + cols, grad_x.to(tl.bfloat16), mask=mask)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+class FusedSoftcappedCrossEntropy(torch.autograd.Function):</span>
+<span class="diff-add">+    @staticmethod</span>
+<span class="diff-add">+    def forward(ctx, logits, targets, mtp_weights, A=23.0, B=5.0, C=7.5):</span>
+<span class="diff-add">+        n_rows, n_cols = logits.shape</span>
+<span class="diff-add">+        if mtp_weights is None:</span>
+<span class="diff-add">+             mtp_weights = torch.tensor([1.0], device=logits.device, dtype=torch.float32)</span>
+<span class="diff-add">+        n_predict = mtp_weights.shape[0]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        losses = torch.empty(n_rows, dtype=torch.float32, device=logits.device)</span>
+<span class="diff-add">+        lse = torch.empty(n_rows, dtype=torch.float32, device=logits.device)</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        logits = logits.contiguous()</span>
+<span class="diff-add">+        targets = targets.contiguous()</span>
+<span class="diff-add">+        mtp_weights = mtp_weights.contiguous()</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        grid = (n_rows,)</span>
+<span class="diff-add">+        fused_softcapped_entropy_fwd_kernel[grid](</span>
+<span class="diff-add">+            logits, losses, lse, targets, mtp_weights,</span>
+<span class="diff-add">+            logits.stride(0), logits.stride(1),</span>
+<span class="diff-add">+            n_rows, n_cols, n_predict,</span>
+<span class="diff-add">+            A, B, C,</span>
+<span class="diff-add">+            BLOCK_SIZE=1024,</span>
+<span class="diff-add">+            num_warps=8,</span>
+<span class="diff-add">+            num_stages=4</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        ctx.save_for_backward(logits, targets, mtp_weights, lse)</span>
+<span class="diff-add">+        ctx.params = (A, B, C)</span>
+<span class="diff-add">+        return losses</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    @staticmethod</span>
+<span class="diff-add">+    def backward(ctx, grad_output):</span>
+<span class="diff-add">+        logits, targets, mtp_weights, lse = ctx.saved_tensors</span>
+<span class="diff-add">+        A, B, C = ctx.params</span>
+<span class="diff-add">+        n_rows, n_cols = logits.shape</span>
+<span class="diff-add">+        n_predict = mtp_weights.shape[0]</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        grad_input = torch.empty((n_rows, n_cols), dtype=torch.bfloat16, device=logits.device)</span>
+<span class="diff-add">+        grad_output = grad_output.contiguous()</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+        grid = (n_rows,)</span>
+<span class="diff-add">+        fused_softcapped_entropy_bwd_kernel[grid](</span>
+<span class="diff-add">+            grad_input, grad_output, lse, logits, targets, mtp_weights,</span>
+<span class="diff-add">+            logits.stride(0), logits.stride(1), grad_input.stride(0), grad_input.stride(1),</span>
+<span class="diff-add">+            n_rows, n_cols, n_predict,</span>
+<span class="diff-add">+            A, B, C,</span>
+<span class="diff-add">+            BLOCK_SIZE=1024,</span>
+<span class="diff-add">+            num_warps=8,</span>
+<span class="diff-add">+            num_stages=4</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        return grad_input, None, None, None, None, None</span>
+<span class="diff-ctx">\ No newline at end of file</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #200)</span>
+                    <span>21 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/README.md <span class="add" style="color:var(--green)">+259</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/30446aee-70bb-4d79-9ad4-3407acd477ae.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/38ec4d01-bebe-4f15-9111-38eb03ced725.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/60bef235-9a86-40ca-ad92-2f739729a877.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/a654d94c-4c36-47ec-ae00-6fedc7fb73f2.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/af63f85d-67c8-43b5-a161-b4606364e56c.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/b39c3d6a-b032-4795-a207-8803b3b58404.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/e19c1816-47f2-4072-98e8-4d25c54ee4ba.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/baseline/f347ff0c-3423-4a00-a1bb-a089ee6a21a6.txt <span class="add" style="color:var(--green)">+4110</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/gradient_stacking_and_unstacking.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/lm_head-backward-kernel.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/lm_head_grad_accum_in_muon_step.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/2fc79469-a527-4bde-8540-8426ed3352d1.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/5799b6a0-2e81-488c-a618-5f1e56acaa8e.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/58bee41f-e27b-415c-a1b3-b87a70144ef8.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/5a0969fe-921d-4b92-964f-314b1175a9b2.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/b92e270c-1c0f-427f-bc5b-27c135875cc3.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/d0dca4ba-0395-4363-8b03-8547d659bb09.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/e4b5a644-b816-4c86-8311-fa6352289e71.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">records/track_1_short/2026-01-18_UnifiedOptimizers/unified-optimizer/e7de5c2e-3bf5-455f-b9f9-c41a3e81bc02.txt <span class="add" style="color:var(--green)">+4263</span></li><li style="color:var(--muted);font-size:0.85rem">train_gpt.py <span class="add" style="color:var(--green)">+796</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>2fc79469-a527-4bde-8540-8426ed3352d1.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2794</td>
+                <td>104.5s</td>
+                <td>1765</td>
+                <td>59.20ms</td>
+                <td>28944 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 2fc79469-a527-4bde-8540-8426ed3352d1.txt</span>
+                    <span>1803 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 1803 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line"></span><span class="line"># Read the current file and the kernels file code ASAP, for logging</span><span class="line">with open(sys.argv[0], &#x27;r&#x27;) as f: </span><span class="line">    code = f.read()</span><span class="line">with open(os.path.join(os.path.dirname(sys.argv[0]), &#x27;triton_kernels.py&#x27;), &#x27;r&#x27;) as f:</span><span class="line">    code += f&quot;\n\n{&#x27;-&#x27;*40}\n# triton_kernels.py\n{&#x27;-&#x27;*40}\n\n&quot; </span><span class="line">    code += f.read()</span><span class="line"></span><span class="line">import copy</span><span class="line">import glob</span><span class="line">import math</span><span class="line">import threading</span><span class="line">import time</span><span class="line">import uuid</span><span class="line">from dataclasses import dataclass</span><span class="line">from itertools import accumulate</span><span class="line">from pathlib import Path</span><span class="line">import gc</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line">import triton</span><span class="line"></span><span class="line">torch.empty(</span><span class="line">    1, device=f&quot;cuda:{os.environ[&#x27;LOCAL_RANK&#x27;]}&quot;, requires_grad=True</span><span class="line">).backward()  # prevents a bug on some systems</span><span class="line">import torch._dynamo as dynamo</span><span class="line">import torch.distributed as dist</span><span class="line">import torch.nn.functional as F</span><span class="line"></span><span class="line"># torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line">from kernels import get_kernel</span><span class="line">from torch import Tensor, nn</span><span class="line"></span><span class="line">from triton_kernels import XXT, ba_plus_cAA, FusedLinearReLUSquareFunction, FusedSoftcappedCrossEntropy</span><span class="line"></span><span class="line">dynamo.config.recompile_limit = 64</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"># Transposed layout by @ChrisJMcCormick allows for faster gradient accumulation.</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_t&quot;, mutates_args=())</span><span class="line">def mm_t_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    &quot;&quot;&quot;Computes y = x @ w with F8 weights stored as (in_features, out_features).&quot;&quot;&quot;</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        assert x.shape[1] == w.shape[0]  # x: (batch, in), w: (in, out)</span><span class="line"></span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">        # _scaled_mm requires column-major B. w_f8 is row-major (in, out).</span><span class="line">        # .T.contiguous().T creates a column-major view without changing logical shape.</span><span class="line">        w_f8_col_major = w_f8.T.contiguous().T</span><span class="line"></span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8_col_major,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_t_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[0]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_t_backward&quot;, mutates_args=())</span><span class="line">def mm_t_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        </span><span class="line">        x_scale = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_scale = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_scale = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        </span><span class="line">        # grad_x = grad @ w.T</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T, </span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_scale,</span><span class="line">            scale_b=w_scale,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        </span><span class="line">        # grad_w = x.T @ grad</span><span class="line">        # Result is (in, out), naturally matching weight storage. No final .T needed.</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_scale,</span><span class="line">            scale_b=grad_scale,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        </span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    grad_x, grad_w = impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">    return grad_x, grad_w</span><span class="line"></span><span class="line">@mm_t_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.to(torch.float32)</span><span class="line"></span><span class="line">def backward_t(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_t_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context_t(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_t_op.register_autograd(backward_t, setup_context=setup_context_t)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Polar Express</span><span class="line"></span><span class="line"># Computed for num_iters=5, safety_factor=2e-2, cushion=2</span><span class="line">polar_express_coeffs = [</span><span class="line">    (8.156554524902461, -22.48329292557795, 15.878769915207462),</span><span class="line">    (4.042929935166739, -2.808917465908714, 0.5000178451051316),</span><span class="line">    (3.8916678022926607, -2.772484153217685, 0.5060648178503393),</span><span class="line">    (3.285753657755655, -2.3681294933425376, 0.46449024233003106),</span><span class="line">    (2.3465413258596377, -1.7097828382687081, 0.42323551169305323)</span><span class="line">]</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span><span class="line">def polar_express(G: torch.Tensor, split_baddbmm: bool = False):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Polar Express Sign Method: https://arxiv.org/pdf/2505.16932</span><span class="line">    by Noah Amsel, David Persson, Christopher Musco, Robert M. Gower.</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) * (1 + 2e-2) + 1e-6)</span><span class="line"></span><span class="line">    # Allocate buffers</span><span class="line">    X = X.contiguous()</span><span class="line">    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span><span class="line">    B = torch.empty_like(A)</span><span class="line">    C = torch.empty_like(X)</span><span class="line"></span><span class="line">    # Select batched vs unbatched</span><span class="line">    if split_baddbmm:</span><span class="line">        BX_matmul = torch.bmm if X.ndim &gt; 2 else torch.mm</span><span class="line">    else:</span><span class="line">        aX_plus_BX = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span><span class="line"></span><span class="line">    # Perform the iterations</span><span class="line">    for a, b, c in polar_express_coeffs:</span><span class="line">        XXT(X, out=A)  # A = X @ X.mT</span><span class="line">        ba_plus_cAA(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span><span class="line"></span><span class="line">        # Referencing X twice causes pytorch to make a defensive copy,</span><span class="line">        # resulting in a cudaMemcpyAsync in baddbmm.</span><span class="line">        # For large matrices (i.e., the mlp weights), it&#x27;s faster to split</span><span class="line">        # the operation into two kernels to avoid this.</span><span class="line">        if split_baddbmm:</span><span class="line">            BX_matmul(B, X, out=C)  # C = B @ X</span><span class="line">            C.add_(X, alpha=a)      # C = C + a*X  (in-place, X only read)</span><span class="line">        else:</span><span class="line">            aX_plus_BX(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span><span class="line"></span><span class="line">        X, C = C, X  # Swap references to avoid unnecessary copies</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Combined NorMuon + Adam Optimizer</span><span class="line"></span><span class="line">@dataclass</span><span class="line">class ParamConfig:</span><span class="line">    &quot;&quot;&quot;Per-parameter configuration for NorMuonAndAdam optimizer.&quot;&quot;&quot;</span><span class="line">    label: str</span><span class="line">    optim: str  # &quot;adam&quot; or &quot;normuon&quot;</span><span class="line">    comms: str  # &quot;none&quot;, &quot;replicated&quot;, or &quot;sharded&quot;</span><span class="line">    adam_betas: tuple[float, float] | None</span><span class="line">    lr_mul: float</span><span class="line">    wd_mul: float</span><span class="line">    lr: float</span><span class="line">    initial_lr: float</span><span class="line">    weight_decay: float</span><span class="line">    # Adam-specific</span><span class="line">    eps: float | None = None</span><span class="line">    # NorMuon-specific</span><span class="line">    reshape: tuple | None = None</span><span class="line">    chunk_size: int | None = None</span><span class="line">    momentum: float | None = None</span><span class="line">    beta2: float | None = None</span><span class="line">    per_matrix_lr_mul: list[float] | None = None</span><span class="line"></span><span class="line"></span><span class="line">class NorMuonAndAdam:</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Combined optimizer that handles both NorMuon (for projection matrices) and </span><span class="line">    Adam (for embeddings/scalars/gate weights).</span><span class="line"></span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, Muon uses a Newton-Schulz iteration (replaced</span><span class="line">    here with Polar Express), which has the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Muon is applied only to the projection matrices in the attention and MLP layers, and is not recommended</span><span class="line">    for embeddings, scalars, or individual weight vectors (e.g., bias terms or gate weights). </span><span class="line"></span><span class="line">    Differences from standard Muon:</span><span class="line">    - Newton-Shulz is replaced with Polar Express for the orthogonalization step</span><span class="line">    - NorMuon adds a low-rank variance estimator similar to Adafactor. https://arxiv.org/pdf/2510.05491</span><span class="line">    - Cautious weight decay, a gated version of decoupled weight decay</span><span class="line">    - Mantissa tracking for precision</span><span class="line">    </span><span class="line">    Adam (for embeddings/scalars/gates):</span><span class="line">    - Standard Adam with bias correction</span><span class="line">    - Cautious weight decay</span><span class="line"></span><span class="line">    Configuration:</span><span class="line">    Unlike torch.optim.Optimizer, this class uses per-parameter configs from a `param_table` dict</span><span class="line">    and does not include parameter &quot;groups&quot;. All parameters require a .label attribute, and a </span><span class="line">    corresponding entry in the param_table to specify their hyperparameters (lr_mul, wd_mul, adam_betas, etc.).</span><span class="line"></span><span class="line">    Communication and ordering:</span><span class="line">    Gradient communication is explicitly scheduled rather than hook-driven.</span><span class="line">    Reductions are launched in `scatter_order`, while update math and final</span><span class="line">    gathers are executed in `work_order`. These orders are independent and</span><span class="line">    must each contain every parameter label exactly once.</span><span class="line"></span><span class="line">    Two communication modes are supported per parameter:</span><span class="line">    - &#x27;replicated&#x27;: Gradients are all-reduced and each rank computes the full update.</span><span class="line">    - &#x27;sharded&#x27;: Gradients are reduce-scattered, each rank updates its shard,</span><span class="line">      and results are all-gathered.</span><span class="line"></span><span class="line">    Adam parameters may be freely sharded. NorMuon operates on full matrices; sharding is </span><span class="line">    supported by grouping matrices into parameter banks. NorMuon parameters must have a</span><span class="line">    `.reshape` attribute that reshapes the bank so that the leading dimension is divisible </span><span class="line">    by world_size.</span><span class="line"></span><span class="line">    # Contributors include @YouJiacheng, @KonstantinWilleke, @alexrgilbert, @adricarda,</span><span class="line">    # @tuttyfrutyee, @vdlad, @ryanyang0, @vagrawal, @varunneal, @chrisjmccormick</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, named_params, param_table: dict, scatter_order: list, work_order: list,</span><span class="line">                 adam_defaults: dict, normuon_defaults: dict):</span><span class="line">        self.world_size = dist.get_world_size() if dist.is_initialized() else 1</span><span class="line">        </span><span class="line">        # Store defaults for each optimizer type</span><span class="line">        self.adam_defaults = adam_defaults</span><span class="line">        self.normuon_defaults = normuon_defaults</span><span class="line">        self.param_table = param_table</span><span class="line">        self.scatter_order = scatter_order</span><span class="line">        self.work_order = work_order</span><span class="line">        </span><span class="line">        # Collect params by label and build config</span><span class="line">        self.param_cfgs: dict[nn.Parameter, ParamConfig] = {}</span><span class="line">        self.param_states: dict[nn.Parameter, dict] = {}</span><span class="line">        self._param_by_label: dict[str, nn.Parameter] = {}</span><span class="line">        for name, param in named_params:</span><span class="line">            label = getattr(param, &quot;label&quot;, None)</span><span class="line">            assert label is not None and label in param_table  # all params must have valid label</span><span class="line">            assert label not in self._param_by_label  # exactly one param per label</span><span class="line">            self._param_by_label[label] = param</span><span class="line">            self._build_param_cfg(param, label)</span><span class="line">        </span><span class="line">        # Assert scatter_order and work_order match present labels exactly</span><span class="line">        present = set(self._param_by_label.keys())</span><span class="line">        assert set(scatter_order) == present and set(work_order) == present</span><span class="line">        </span><span class="line">        # Handle world_size=1: overwrite comms to &quot;none&quot;</span><span class="line">        if self.world_size == 1:</span><span class="line">            for p_cfg in self.param_cfgs.values():</span><span class="line">                p_cfg.comms = &quot;none&quot;</span><span class="line">        </span><span class="line">        # Initialize state for all params</span><span class="line">        self._init_state()</span><span class="line">        </span><span class="line">        # 0-D CPU tensors to avoid recompilation</span><span class="line">        self._step_size_t = torch.tensor(0.0, dtype=torch.float32, device=&quot;cpu&quot;)</span><span class="line">        self._eff_wd_t = torch.tensor(0.0, dtype=torch.float32, device=&quot;cpu&quot;)</span><span class="line">        self._eff_lr_t = torch.tensor(0.0, dtype=torch.float32, device=&quot;cpu&quot;)</span><span class="line">        </span><span class="line">        # Track async operations</span><span class="line">        self._reduce_futures: dict[nn.Parameter, tuple] = {}</span><span class="line">        </span><span class="line">        # Embed/lm_head tying state</span><span class="line">        self.split_embed = False</span><span class="line">        self._lm_head_param = self._param_by_label.get(&quot;lm_head&quot;)</span><span class="line">        self._embed_param = self._param_by_label.get(&quot;embed&quot;)</span><span class="line">    </span><span class="line">    def _build_param_cfg(self, param: nn.Parameter, label: str):</span><span class="line">        &quot;&quot;&quot;Build config for a single parameter from param_table.&quot;&quot;&quot;</span><span class="line">        table_entry = self.param_table[label]</span><span class="line">        optim = table_entry[&quot;optim&quot;]</span><span class="line">        comms = table_entry[&quot;comms&quot;]</span><span class="line">        adam_betas = table_entry.get(&quot;adam_betas&quot;)</span><span class="line">        lr_mul = table_entry.get(&quot;lr_mul&quot;, 1.0)</span><span class="line">        wd_mul = table_entry.get(&quot;wd_mul&quot;, 1.0)</span><span class="line">        </span><span class="line">        if optim == &quot;adam&quot;:</span><span class="line">            chunk_size = param.shape[0] // self.world_size if comms == &quot;sharded&quot; else None</span><span class="line">            p_cfg = ParamConfig(</span><span class="line">                label=label,</span><span class="line">                optim=optim,</span><span class="line">                comms=comms,</span><span class="line">                adam_betas=tuple(adam_betas) if adam_betas else None,</span><span class="line">                lr_mul=lr_mul,</span><span class="line">                wd_mul=wd_mul,</span><span class="line">                lr=self.adam_defaults[&quot;lr&quot;],</span><span class="line">                initial_lr=self.adam_defaults[&quot;lr&quot;],</span><span class="line">                weight_decay=self.adam_defaults[&quot;weight_decay&quot;],</span><span class="line">                eps=self.adam_defaults[&quot;eps&quot;],</span><span class="line">                chunk_size=chunk_size,</span><span class="line">            )</span><span class="line">        elif optim == &quot;normuon&quot;:</span><span class="line">            reshape = getattr(param, &quot;reshape&quot;, None)</span><span class="line">            if reshape is None:</span><span class="line">                raise ValueError(f&quot;NorMuon param {label} must have .reshape attribute&quot;)</span><span class="line">            if reshape[0] % self.world_size != 0:</span><span class="line">                raise ValueError(f&quot;reshape[0]={reshape[0]} must be divisible by world_size&quot;)</span><span class="line">            </span><span class="line">            chunk_size = reshape[0] // self.world_size</span><span class="line">            chunk_shape = (chunk_size, *reshape[1:])</span><span class="line">            # Shape-based LR multiplier for NorMuon</span><span class="line">            shape_mult = max(1.0, chunk_shape[-2] / chunk_shape[-1]) ** 0.5 if len(chunk_shape) &gt;= 2 else 1.0</span><span class="line">            lr_mul = shape_mult * lr_mul</span><span class="line">            </span><span class="line">            # Per-matrix LR multipliers for MLP c_proj (2x LR on odd indices)</span><span class="line">            per_matrix_lr_mul = None</span><span class="line">            if label == &quot;mlp&quot;:</span><span class="line">                rank = dist.get_rank() if dist.is_initialized() else 0</span><span class="line">                start_idx = rank * chunk_size</span><span class="line">                per_matrix_lr_mul = []</span><span class="line">                for i in range(chunk_size):</span><span class="line">                    global_idx = start_idx + i</span><span class="line">                    is_c_proj = (global_idx % 2 == 1)</span><span class="line">                    per_matrix_lr_mul.append(2.0 if is_c_proj else 1.0)</span><span class="line">            </span><span class="line">            p_cfg = ParamConfig(</span><span class="line">                label=label,</span><span class="line">                optim=optim,</span><span class="line">                comms=comms,</span><span class="line">                adam_betas=tuple(adam_betas) if adam_betas else None,</span><span class="line">                lr_mul=lr_mul,</span><span class="line">                wd_mul=wd_mul,</span><span class="line">                lr=self.normuon_defaults[&quot;lr&quot;],</span><span class="line">                initial_lr=self.normuon_defaults[&quot;lr&quot;],</span><span class="line">                weight_decay=self.normuon_defaults[&quot;weight_decay&quot;],</span><span class="line">                reshape=reshape,</span><span class="line">                chunk_size=chunk_size,</span><span class="line">                momentum=self.normuon_defaults[&quot;momentum&quot;],</span><span class="line">                beta2=self.normuon_defaults[&quot;beta2&quot;],</span><span class="line">                per_matrix_lr_mul=per_matrix_lr_mul,</span><span class="line">            )</span><span class="line">        else:</span><span class="line">            raise ValueError(f&quot;Unknown optim type: {optim}&quot;)</span><span class="line">        </span><span class="line">        self.param_cfgs[param] = p_cfg</span><span class="line">    </span><span class="line">    def _init_state(self):</span><span class="line">        &quot;&quot;&quot;Initialize optimizer state for all parameters.&quot;&quot;&quot;</span><span class="line">        for param, p_cfg in self.param_cfgs.items():</span><span class="line">            if p_cfg.optim == &quot;adam&quot;:</span><span class="line">                # Sharded params use chunk state, replicated use full state</span><span class="line">                if p_cfg.comms == &quot;sharded&quot;:</span><span class="line">                    chunk = param[:p_cfg.chunk_size]</span><span class="line">                else:</span><span class="line">                    chunk = param</span><span class="line">                exp_avg = torch.zeros_like(chunk, dtype=torch.float32, device=param.device)</span><span class="line">                self.param_states[param] = dict(step=0, exp_avg=exp_avg, exp_avg_sq=torch.zeros_like(exp_avg))</span><span class="line">            </span><span class="line">            elif p_cfg.optim == &quot;normuon&quot;:</span><span class="line">                chunk_shape = (p_cfg.chunk_size, *p_cfg.reshape[1:])</span><span class="line">                </span><span class="line">                # Momentum buffer (FP32 for precision)</span><span class="line">                momentum_buffer = torch.zeros(</span><span class="line">                    chunk_shape, dtype=torch.float32, device=param.device</span><span class="line">                )</span><span class="line">                </span><span class="line">                # Second momentum buffer - reduced along one dimension</span><span class="line">                if chunk_shape[-2] &gt;= chunk_shape[-1]:</span><span class="line">                    second_mom_shape = (*chunk_shape[:-1], 1)</span><span class="line">                else:</span><span class="line">                    second_mom_shape = (*chunk_shape[:-2], 1, chunk_shape[-1])</span><span class="line">                second_momentum_buffer = torch.zeros(</span><span class="line">                    second_mom_shape, dtype=torch.float32, device=param.device</span><span class="line">                )</span><span class="line">                </span><span class="line">                # Mantissa buffer for precision tracking</span><span class="line">                mantissa = torch.zeros(</span><span class="line">                    chunk_shape, dtype=torch.uint16, device=param.device</span><span class="line">                )</span><span class="line">                </span><span class="line">                self.param_states[param] = dict(</span><span class="line">                    momentum_buffer=momentum_buffer,</span><span class="line">                    second_momentum_buffer=second_momentum_buffer,</span><span class="line">                    mantissa=mantissa,</span><span class="line">                )</span><span class="line"></span><span class="line">    # -----------------------------------</span><span class="line">    # Reduce/Gather operations</span><span class="line">    </span><span class="line">    def _launch_reduce(self, param: nn.Parameter, grad: Tensor):</span><span class="line">        &quot;&quot;&quot;Launch async reduce for a parameter based on its comms policy.&quot;&quot;&quot;</span><span class="line">        p_cfg = self.param_cfgs[param]</span><span class="line">        </span><span class="line">        if p_cfg.comms == &quot;none&quot;:</span><span class="line">            if p_cfg.optim == &quot;normuon&quot;:</span><span class="line">                # NorMuon needs reshaped gradient even without communication</span><span class="line">                grad = grad.view(p_cfg.reshape)</span><span class="line">            self._reduce_futures[param] = (None, grad)</span><span class="line">        elif p_cfg.comms == &quot;replicated&quot;:</span><span class="line">            future = dist.all_reduce(grad, op=dist.ReduceOp.AVG, async_op=True).get_future()</span><span class="line">            self._reduce_futures[param] = (future, grad)</span><span class="line">        elif p_cfg.comms == &quot;sharded&quot;:</span><span class="line">            if p_cfg.optim == &quot;normuon&quot;:</span><span class="line">                # NorMuon: reshape before reduce_scatter</span><span class="line">                grad_reshaped = grad.view(p_cfg.reshape)</span><span class="line">                grad_chunk = torch.empty(</span><span class="line">                    (p_cfg.chunk_size, *grad_reshaped.shape[1:]),</span><span class="line">                    dtype=grad.dtype,</span><span class="line">                    device=grad.device</span><span class="line">                )</span><span class="line">                future = dist.reduce_scatter_tensor(</span><span class="line">                    grad_chunk, grad_reshaped.contiguous(), op=dist.ReduceOp.AVG, async_op=True</span><span class="line">                ).get_future()</span><span class="line">                self._reduce_futures[param] = (future, grad_chunk)</span><span class="line">            else:</span><span class="line">                # Adam: simple reduce_scatter</span><span class="line">                grad_chunk = torch.empty_like(grad[:p_cfg.chunk_size])</span><span class="line">                future = dist.reduce_scatter_tensor(</span><span class="line">                    grad_chunk, grad, op=dist.ReduceOp.AVG, async_op=True</span><span class="line">                ).get_future()</span><span class="line">                self._reduce_futures[param] = (future, grad_chunk)</span><span class="line"></span><span class="line">    def _launch_gather(self, param: nn.Parameter, p_slice: Tensor) -&gt; &quot;torch.futures.Future&quot;:</span><span class="line">        &quot;&quot;&quot;Launch async all_gather for a sharded parameter.&quot;&quot;&quot;</span><span class="line">        p_cfg = self.param_cfgs[param]</span><span class="line">        if p_cfg.optim == &quot;normuon&quot;:</span><span class="line">            full_param = param.data.view(p_cfg.reshape)</span><span class="line">            assert full_param.is_contiguous()</span><span class="line">            return dist.all_gather_into_tensor(</span><span class="line">                full_param, p_slice.contiguous(), async_op=True</span><span class="line">            ).get_future()</span><span class="line">        else:</span><span class="line">            return dist.all_gather_into_tensor(</span><span class="line">                param, p_slice.contiguous(), async_op=True</span><span class="line">            ).get_future()</span><span class="line"></span><span class="line">    # -----------------------------------</span><span class="line">    # State management</span><span class="line">    </span><span class="line">    def reset(self):</span><span class="line">        &quot;&quot;&quot;Reset NorMuon momentum buffers and split_embed state (called on training reset).&quot;&quot;&quot;</span><span class="line">        self.split_embed = False</span><span class="line">        for param, p_cfg in self.param_cfgs.items():</span><span class="line">            if p_cfg.optim == &quot;normuon&quot;:</span><span class="line">                p_state = self.param_states[param]</span><span class="line">                p_state[&quot;momentum_buffer&quot;].zero_()</span><span class="line">                p_state[&quot;mantissa&quot;].zero_()</span><span class="line">                p_state[&quot;second_momentum_buffer&quot;].zero_()</span><span class="line">    </span><span class="line">    def copy_lm_state_to_embed(self):</span><span class="line">        &quot;&quot;&quot;</span><span class="line">        Copy the optimizer state from the lm_head to the embed at the untie point.</span><span class="line">        This requires an all-gather + reshard because of different sharding:</span><span class="line">        - lm_head (768, 50304) is sharded to (96, 50304) per rank (along model_dim)</span><span class="line">        - embed (50304, 768) is sharded to (6288, 768) per rank (along vocab_size)</span><span class="line">        </span><span class="line">        We all-gather the lm_head momentum, transpose it, then each rank takes their</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r62_60_01-16-26.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r64_62_01-19-26.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>

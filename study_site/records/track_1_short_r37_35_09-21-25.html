@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record #35 — Drop first attn layer, extend all long windows for validation, update schedule | NanoGPT Study Guide</title>
+<style>
+:root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --purple: #bc8cff; --orange: #f0883e;
+    --diff-add-bg: #12261e; --diff-del-bg: #2d1215;
+    --diff-add-text: #56d364; --diff-del-text: #f85149;
+    --diff-hunk-bg: #1c2233;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 0; max-width: 100%;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+/* Header */
+.hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 2rem;
+    text-align: center;
+}
+.hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { color: var(--muted); font-size: 1rem; max-width: 700px; margin: 0 auto; }
+
+/* Navigation tabs */
+.tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    background: var(--surface); padding: 0 2rem;
+    position: sticky; top: 0; z-index: 100;
+}
+.tab {
+    padding: 0.8rem 1.5rem; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--muted); transition: all 0.2s;
+    font-family: inherit; font-size: 0.85rem;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Stats bar */
+.stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; padding: 1.5rem 0;
+}
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem; text-align: center;
+}
+.stat-card .number { font-size: 2rem; font-weight: bold; color: var(--accent); }
+.stat-card .label { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; }
+
+/* Category badges */
+.badge {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    border-radius: 12px; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-architecture { background: #1f2d5a; color: #79b8ff; }
+.badge-optimizer { background: #2d1f3d; color: var(--purple); }
+.badge-systems { background: #2d2a1f; color: var(--yellow); }
+.badge-data { background: #1f2d2a; color: var(--green); }
+.badge-training { background: #2d1f1f; color: var(--orange); }
+.badge-other { background: #1f2222; color: var(--muted); }
+
+/* Filter bar */
+.filters {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    padding: 1rem 0; align-items: center;
+}
+.filter-btn {
+    padding: 0.4rem 1rem; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+}
+.filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+}
+
+/* Timeline */
+.timeline { position: relative; padding: 1rem 0; }
+.timeline::before {
+    content: ''; position: absolute; left: 24px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+
+/* Record cards */
+.record-card {
+    position: relative; margin-left: 50px; margin-bottom: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.2rem 1.5rem;
+    transition: all 0.2s; cursor: pointer;
+}
+.record-card:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+}
+.record-card::before {
+    content: ''; position: absolute; left: -34px; top: 1.5rem;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.record-header {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+}
+.record-num {
+    font-size: 0.75rem; color: var(--muted);
+    background: rgba(255,255,255,0.05); padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+}
+.record-title { font-size: 1rem; font-weight: 600; flex: 1; min-width: 200px; }
+.record-time {
+    font-size: 1.2rem; font-weight: bold; color: var(--green);
+    white-space: nowrap;
+}
+.record-meta {
+    display: flex; gap: 1.5rem; margin-top: 0.5rem;
+    font-size: 0.8rem; color: var(--muted); flex-wrap: wrap;
+}
+.record-badges { display: flex; gap: 0.4rem; margin-top: 0.5rem; flex-wrap: wrap; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Chart area */
+.chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2rem; margin: 1rem 0;
+    position: relative; height: 400px;
+}
+.chart-svg { width: 100%; height: 100%; }
+
+/* ── Record detail page ─────────────────────── */
+.detail-hero {
+    background: linear-gradient(135deg, #0d1117, #161b22);
+    padding: 2rem; border-bottom: 1px solid var(--border);
+}
+.breadcrumb { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+.detail-title { font-size: 2rem; margin-bottom: 0.5rem; }
+.detail-time { font-size: 1.5rem; color: var(--green); margin-bottom: 1rem; }
+
+.section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 1rem 0; overflow: hidden;
+}
+.section-header {
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+    font-weight: 600; font-size: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+}
+.section-header:hover { background: rgba(255,255,255,0.02); }
+.section-body { padding: 1.5rem; }
+
+/* Diff viewer */
+.diff-viewer {
+    background: #0d1117; border-radius: 6px; overflow-x: auto;
+    font-size: 0.8rem; line-height: 1.5;
+}
+.diff-file-header {
+    padding: 0.8rem 1rem; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.diff-file-name { font-weight: 600; }
+.diff-stats {
+    font-size: 0.75rem;
+}
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+.diff-content {
+    padding: 0.5rem 1rem; white-space: pre; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.diff-add { color: var(--diff-add-text); background: var(--diff-add-bg); display: block; }
+.diff-del { color: var(--diff-del-text); background: var(--diff-del-bg); display: block; }
+.diff-hunk { color: var(--purple); background: var(--diff-hunk-bg); display: block; padding: 0.2rem 0; }
+.diff-ctx { display: block; }
+
+/* Metrics table */
+.metrics-table {
+    width: 100%; border-collapse: collapse;
+}
+.metrics-table th, .metrics-table td {
+    padding: 0.5rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.metrics-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+
+/* Code viewer */
+.code-viewer {
+    background: #0d1117; border-radius: 6px;
+    font-size: 0.75rem; line-height: 1.5;
+    max-height: 600px; overflow: auto;
+}
+.code-viewer pre {
+    padding: 1rem; white-space: pre; font-family: 'SF Mono', monospace;
+    counter-reset: line;
+}
+.code-viewer pre .line {
+    display: block; counter-increment: line;
+}
+.code-viewer pre .line::before {
+    content: counter(line); display: inline-block; width: 4em;
+    text-align: right; margin-right: 1em; color: var(--muted);
+    opacity: 0.4; font-size: 0.7rem;
+}
+
+/* PR body */
+.pr-body {
+    padding: 1.5rem; font-size: 0.9rem; line-height: 1.8;
+    color: var(--text);
+}
+.pr-body h1, .pr-body h2, .pr-body h3 { margin: 1rem 0 0.5rem; color: var(--accent); }
+.pr-body p { margin: 0.5rem 0; }
+.pr-body code {
+    background: rgba(255,255,255,0.07); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.85em;
+}
+.pr-body pre { background: #0d1117; padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+.pr-body pre code { background: none; padding: 0; }
+.pr-body img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
+.pr-body ul, .pr-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+
+/* Nav buttons */
+.nav-buttons {
+    display: flex; justify-content: space-between; padding: 2rem 0;
+}
+.nav-btn {
+    padding: 0.6rem 1.5rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: inherit;
+    font-size: 0.85rem; transition: all 0.2s;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.muted { color: var(--muted); font-style: italic; }
+
+/* Collapsible */
+.collapsible-content { display: none; }
+.collapsible-content.open { display: block; }
+.toggle-icon { transition: transform 0.2s; display: inline-block; }
+.toggle-icon.open { transform: rotate(90deg); }
+
+/* Study notes */
+.study-note {
+    background: rgba(88, 166, 255, 0.05);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.5rem; margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+}
+.study-note h4 { color: var(--accent); margin-bottom: 0.5rem; font-size: 0.9rem; }
+.study-note p, .study-note ul { font-size: 0.85rem; color: var(--muted); }
+.study-note ul { padding-left: 1.2rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 1rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .record-header { flex-direction: column; }
+    .timeline::before { left: 14px; }
+    .record-card { margin-left: 35px; }
+    .record-card::before { left: -27px; }
+}
+</style>
+</head>
+<body>
+
+<div class="detail-hero">
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../index.html">Study Guide</a> → Track 1: GPT-2 Small → Record #35
+        </div>
+        <div class="detail-title">#35: Drop first attn layer, extend all long windows for validation, update schedule</div>
+        <div class="detail-time">2.527 min</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <span class="badge badge-data">data</span><span class="badge badge-training">training</span>
+            <span style="color:var(--muted);margin-left:1rem">09/21/25</span>
+            <span style="color:var(--muted)">by @classiclarryd</span>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    
+        <div class="section">
+            <div class="section-header">Study Notes</div>
+            <div class="section-body">
+                <div class="study-note">
+                    <h4>What Changed</h4>
+                    <p>Drop first attention layer + extend long windows for validation</p>
+                </div>
+                <div class="study-note">
+                    <h4>Why It Works</h4>
+                    <p>First attention layer is least impactful. Extending all long-window layers to full context during validation gives free eval improvement.</p>
+                </div>
+                <div class="study-note">
+                    <h4>Key Concepts to Understand</h4>
+                    <ul><li>Layer pruning</li><li>Validation-time window extension</li><li>Compute reallocation</li></ul>
+                </div>
+                <div class="study-note">
+                    <h4>Change Type</h4>
+                    <p>architecture + training</p>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> PR #131: New WR 151.5s: Drop first attn layer, extend all long windows for validation, update schedule</span>
+                <span class="diff-stats">
+                    <span class="add">+273784</span> / <span class="del">-263</span> in 103 files
+                    — by @ClassicLarry
+                </span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="pr-body"><p>This PR builds on all recent WR improvements including PR #130. Updates:
+* Drop the first attention layer.
+* Increase step count from 1645 to 1680
+* Extend all long windows to size 20 for validation (-0.001 loss, or ~10 steps = 1s)
+* Add arg iteration_extension, to specify number of steps to continue training at final lr and ws 
+
+Several factors led to dropping the first attention layer:
+* The first attention layer was <a href="https://medium.com/@larry36d/formation-of-induction-heads-in-modded-nanogpt-5eb899de89e4" target="_blank">observed</a> to perform no meaningful contribution to induction heads. 
+* PR #120 dropped the first MLP, which resulted in two Attn layers with no intermediate transformation
+* PR #130 added a smear module, which increased the networks ability to pass information between tokens
+
+Reason for iteration_extension:
+* Showed 0.001 improvement in loss.
+* Easier to fine tune. Without this parameter, changes to the step count have a large effect on the entire second half of training, making it harder to isolate impact of changes. This is because lr and ws are tied to the step count. EG if you increase step count by 10 you will suddenly see different loss at step 1000.
+
+<h3>Future Opportunities</h3>
+This change bring the total number of [4,768,768] attention variables to 10. There are 22 MLP variables of size [768x4,768]. In Muon attention is getting batched such that 6/16ths on the gradient calcs are on padding tokens. There may be a way to move 2 of the attention variables into the MLP batch, such that MLP is 24/24 and attn is 8/8, instead of MLP being 22/24 and attn being 10/16.
+
+<h3>Investigating Muon for 1D variables</h3>
+Currently the attention gates and smear gate are passed into Muon. From light inspection, the implementation of newton schulz appears to roughly apply F.normalize(x, p=2, dim=-1) for 1d variables. This normalization makes all steps cover roughly the same distance, regardless of the gradient. So for 1d variables Muon turns into an exponential smoothing over prior gradients, where each step is normalized to be roughly the same size. This seems somewhat reasonable. Swapping these variables over to Adam gave roughly a 0.5s runtime increase and no improvement in loss. Directly replacing newton schulz with F.normalize(x, p=2, dim=-1) for these variables showed slightly worse performance. I do not understand the theory here yet, but empirically the performance is good.
+
+
+<h2>Validation:</h2>
+Code syntax/naming was lightly refactored after performing validation runs. Loss is roughly 0.001 lower than prior record, which is roughly equal to 1s.
+``<code>
+import scipy.stats
+import torch
+
+accs = [3.2786, 3.2798, 3.2762, 3.2781, 3.2778, 3.2801, 3.2774, 3.2772,
+       3.2777, 3.2789]
+
+times = [151.559, 151.526, 151.516, 151.527, 151.606, 151.771, 151.546,
+       151.547, 151.44 , 151.872]
+
+print(&quot;p=%.4f&quot; % scipy.stats.ttest_1samp(accs, 3.28, alternative=&quot;less&quot;).pvalue)
+<h1>p=0.0005</h1>
+print(&quot;acc:&quot;, torch.std_mean(torch.tensor(accs)))
+<h1>acc: (tensor(0.0012), tensor(3.2782))</h1>
+
+print(&quot;time:&quot;, torch.std_mean(torch.tensor(times)))
+<h1>time: (tensor(0.1305), tensor(151.5910))</h1>
+</code>``</p></div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon open">▶</span> Code Changes (PR #131)</span>
+                    <span>4 file(s) modified</span>
+                </div>
+                <div class="collapsible-content open">
+                    <div class="section-body">
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] .gitignore</span>
+                        <span class="diff-stats"><span class="add">+1</span> <span class="del">-0</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -2,3 +2,4 @@ fineweb10B/</span>
+<span class="diff-ctx"> pylog124M/</span>
+<span class="diff-ctx"> __pycache__/</span>
+<span class="diff-ctx"> logs/</span>
+<span class="diff-add">+.DS_Store</span></div>
+                </div>
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] README.md</span>
+                        <span class="diff-stats"><span class="add">+2</span> <span class="del">-2</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -38,8 +38,8 @@ To run the current record, run the following commands.</span>
+<span class="diff-ctx"> git clone https://github.com/KellerJordan/modded-nanogpt.git &amp;&amp; cd modded-nanogpt</span>
+<span class="diff-ctx"> pip install -r requirements.txt</span>
+<span class="diff-ctx"> pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu126 --upgrade</span>
+<span class="diff-del">-# downloads only the first 800M training tokens to save time</span>
+<span class="diff-del">-python data/cached_fineweb10B.py 8</span>
+<span class="diff-add">+# downloads only the first 900M training tokens to save time</span>
+<span class="diff-add">+python data/cached_fineweb10B.py 9</span>
+<span class="diff-ctx"> ./run.sh</span>
+<span class="diff-ctx"> ```</span>
+<span class="diff-ctx"> </span></div>
+                </div>
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] requirements.txt</span>
+                        <span class="diff-stats"><span class="add">+2</span> <span class="del">-0</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -2,3 +2,5 @@ numpy</span>
+<span class="diff-ctx"> tqdm</span>
+<span class="diff-ctx"> torch</span>
+<span class="diff-ctx"> huggingface-hub</span>
+<span class="diff-add">+triton</span>
+<span class="diff-add">+flash-attn</span>
+<span class="diff-ctx">\ No newline at end of file</span></div>
+                </div>
+                <div class="diff-viewer">
+                    <div class="diff-file-header">
+                        <span class="diff-file-name">[M] train_gpt.py</span>
+                        <span class="diff-stats"><span class="add">+883</span> <span class="del">-261</span></span>
+                    </div>
+                    <div class="diff-content"><span class="diff-hunk">@@ -1,28 +1,40 @@</span>
+<span class="diff-ctx"> import os</span>
+<span class="diff-ctx"> import sys</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> with open(sys.argv[0]) as f:</span>
+<span class="diff-del">-    code = f.read() # read the code of this file ASAP, for logging</span>
+<span class="diff-del">-import uuid</span>
+<span class="diff-del">-import time</span>
+<span class="diff-add">+    code = f.read()  # read the code of this file ASAP, for logging</span>
+<span class="diff-ctx"> import copy</span>
+<span class="diff-ctx"> import glob</span>
+<span class="diff-add">+import math</span>
+<span class="diff-add">+import threading</span>
+<span class="diff-add">+import time</span>
+<span class="diff-add">+import uuid</span>
+<span class="diff-ctx"> from dataclasses import dataclass</span>
+<span class="diff-del">-from functools import lru_cache, partial # Added partial for hook registration</span>
+<span class="diff-add">+from itertools import accumulate</span>
+<span class="diff-ctx"> from pathlib import Path</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> os.environ[&quot;PYTORCH_CUDA_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span>
+<span class="diff-ctx"> import torch</span>
+<span class="diff-del">-torch.empty(1, device=&quot;cuda&quot;, requires_grad=True).backward() # prevents a bug on some systems</span>
+<span class="diff-del">-from torch import Tensor, nn</span>
+<span class="diff-del">-import torch.nn.functional as F</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+torch.empty(</span>
+<span class="diff-add">+    1, device=&quot;cuda&quot;, requires_grad=True</span>
+<span class="diff-add">+).backward()  # prevents a bug on some systems</span>
+<span class="diff-add">+import torch._dynamo as dynamo</span>
+<span class="diff-ctx"> import torch.distributed as dist</span>
+<span class="diff-del">-# use of FlexAttention contributed by @KoszarskyB</span>
+<span class="diff-del">-from torch.nn.attention.flex_attention import BlockMask, flex_attention</span>
+<span class="diff-del">-#torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span>
+<span class="diff-add">+import torch.nn.functional as F</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+# torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span>
+<span class="diff-add">+import triton</span>
+<span class="diff-add">+import triton.language as tl</span>
+<span class="diff-add">+from flash_attn_interface import flash_attn_varlen_func</span>
+<span class="diff-add">+from torch import Tensor, nn</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+dynamo.config.recompile_limit = 64</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-ctx"> # Custom operators: FP8 matmul by @YouJiacheng</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> @torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span>
+<span class="diff-ctx"> def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span>
+<span class="diff-ctx">     @torch.compile</span>
+<span class="diff-hunk">@@ -102,37 +114,287 @@ def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span>
+<span class="diff-ctx"> mm_op.register_autograd(backward, setup_context=setup_context)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-del">-# Muon optimizer</span>
+<span class="diff-add">+# Triton kernel for symmetric matrix multiplication by @byronxu99</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def _get_autotune_configs():</span>
+<span class="diff-add">+    return [</span>
+<span class="diff-add">+        triton.Config(</span>
+<span class="diff-add">+            {</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_M&quot;: bm,</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_N&quot;: bn,</span>
+<span class="diff-add">+                &quot;BLOCK_SIZE_K&quot;: bk,</span>
+<span class="diff-add">+                &quot;GROUP_SIZE_M&quot;: 8,</span>
+<span class="diff-add">+                &quot;LOWER_UPPER&quot;: 1,</span>
+<span class="diff-add">+            },</span>
+<span class="diff-add">+            num_stages=stages,</span>
+<span class="diff-add">+            num_warps=warps,</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        for bm in [64, 128]</span>
+<span class="diff-add">+        for bn in [64, 128, 256]</span>
+<span class="diff-add">+        for bk in [64, 128]</span>
+<span class="diff-add">+        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span>
+<span class="diff-add">+        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span>
+<span class="diff-add">+    ]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def _pid_to_block(</span>
+<span class="diff-add">+    pid,</span>
+<span class="diff-add">+    M,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Map PID to a single matrix in batch</span>
+<span class="diff-add">+    batch_idx = pid // (num_pid_m * num_pid_n)</span>
+<span class="diff-add">+    pid = pid % (num_pid_m * num_pid_n)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Map PID to 2D grid of blocks</span>
+<span class="diff-add">+    pid_m = pid // num_pid_n</span>
+<span class="diff-add">+    pid_n = pid % num_pid_n</span>
+<span class="diff-add">+    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    m_idx = pid_m * BLOCK_SIZE_M</span>
+<span class="diff-add">+    n_idx = pid_n * BLOCK_SIZE_N</span>
+<span class="diff-add">+    return batch_idx, m_idx, n_idx</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.autotune(</span>
+<span class="diff-add">+    configs=_get_autotune_configs(),</span>
+<span class="diff-add">+    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span>
+<span class="diff-add">+)</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def ns_line_1_kernel(</span>
+<span class="diff-add">+    A_ptr, C_ptr,</span>
+<span class="diff-add">+    M, K,</span>
+<span class="diff-add">+    a_stride_b, a_stride_r, a_stride_c,</span>
+<span class="diff-add">+    c_stride_b, c_stride_r, c_stride_c,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_K: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    LOWER_UPPER: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    pid = tl.program_id(axis=0)</span>
+<span class="diff-add">+    batch_idx, m_idx, n_idx = _pid_to_block(</span>
+<span class="diff-add">+        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span>
+<span class="diff-add">+    )</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-@torch.compile</span>
+<span class="diff-del">-def zeropower_via_newtonschulz5(G: Tensor, steps: int) -&gt; Tensor:</span>
+<span class="diff-add">+    # Skip blocks that don&#x27;t need to be computed</span>
+<span class="diff-add">+    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span>
+<span class="diff-add">+    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span>
+<span class="diff-add">+    if skip_block_below_diag or skip_block_above_diag:</span>
+<span class="diff-add">+        return</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Index into one matrix of batch</span>
+<span class="diff-add">+    A_ptr += batch_idx * a_stride_b</span>
+<span class="diff-add">+    C_ptr += batch_idx * c_stride_b</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Create pointer arrays for A and A.T</span>
+<span class="diff-add">+    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span>
+<span class="diff-add">+    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span>
+<span class="diff-add">+    offs_k = tl.arange(0, BLOCK_SIZE_K)</span>
+<span class="diff-add">+    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span>
+<span class="diff-add">+    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Accumulate over blocks of K</span>
+<span class="diff-add">+    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span>
+<span class="diff-add">+        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        accumulator = tl.dot(a, at, accumulator)</span>
+<span class="diff-add">+        a_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+        at_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    out_dtype = C_ptr.dtype.element_ty</span>
+<span class="diff-add">+    output = accumulator.to(out_dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C</span>
+<span class="diff-add">+    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs, output, mask=c_mask)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C mirrored across the diagonal</span>
+<span class="diff-add">+    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def ns_line_1(A: torch.Tensor, out: torch.Tensor):</span>
+<span class="diff-ctx">     &quot;&quot;&quot;</span>
+<span class="diff-del">-    Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a</span>
+<span class="diff-del">-    quintic iteration whose coefficients are selected to maximize the slope at zero. For the purpose</span>
+<span class="diff-del">-    of minimizing steps, it turns out to be empirically effective to keep increasing the slope at</span>
+<span class="diff-del">-    zero even beyond the point where the iteration no longer converges all the way to one everywhere</span>
+<span class="diff-del">-    on the interval. This iteration therefore does not produce UV^T but rather something like US&#x27;V^T</span>
+<span class="diff-del">-    where S&#x27; is diagonal with S_{ii}&#x27; ~ Uniform(0.5, 1.5), which turns out not to hurt model</span>
+<span class="diff-del">-    performance at all relative to UV^T, where USV^T = G is the SVD.</span>
+<span class="diff-add">+    Launch Triton kernel to compute C = A @ A.T</span>
+<span class="diff-ctx">     &quot;&quot;&quot;</span>
+<span class="diff-del">-    assert G.ndim &gt;= 2 # batched Muon implementation by @scottjmaddox, and put into practice in the record by @YouJiacheng</span>
+<span class="diff-del">-    a, b, c = (3.4445, -4.7750,  2.0315)</span>
+<span class="diff-del">-    X = G</span>
+<span class="diff-add">+    assert A.ndim == 2 or A.ndim == 3</span>
+<span class="diff-add">+    M, K = A.shape[-2:]</span>
+<span class="diff-add">+    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span>
+<span class="diff-add">+    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    batch_size = A.size(0) if A.ndim == 3 else 1</span>
+<span class="diff-add">+    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span>
+<span class="diff-add">+    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    grid = lambda meta: (</span>
+<span class="diff-add">+        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    ns_line_1_kernel[grid](</span>
+<span class="diff-add">+        A_ptr=A,</span>
+<span class="diff-add">+        C_ptr=out,</span>
+<span class="diff-add">+        M=M,</span>
+<span class="diff-add">+        K=K,</span>
+<span class="diff-add">+        a_stride_b=input_batch_stride,</span>
+<span class="diff-add">+        a_stride_r=A.stride(-2),</span>
+<span class="diff-add">+        a_stride_c=A.stride(-1),</span>
+<span class="diff-add">+        c_stride_b=output_batch_stride,</span>
+<span class="diff-add">+        c_stride_r=out.stride(-2),</span>
+<span class="diff-add">+        c_stride_c=out.stride(-1),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    return out</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@triton.autotune(</span>
+<span class="diff-add">+    configs=_get_autotune_configs(),</span>
+<span class="diff-add">+    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span>
+<span class="diff-add">+)</span>
+<span class="diff-add">+@triton.jit</span>
+<span class="diff-add">+def ns_line_2_kernel(</span>
+<span class="diff-add">+    A_ptr, C_ptr,</span>
+<span class="diff-add">+    M,</span>
+<span class="diff-add">+    a_stride_b, a_stride_r, a_stride_c,</span>
+<span class="diff-add">+    c_stride_b, c_stride_r, c_stride_c,</span>
+<span class="diff-add">+    alpha, beta,</span>
+<span class="diff-add">+    BLOCK_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_N: tl.constexpr,</span>
+<span class="diff-add">+    BLOCK_SIZE_K: tl.constexpr,</span>
+<span class="diff-add">+    GROUP_SIZE_M: tl.constexpr,</span>
+<span class="diff-add">+    LOWER_UPPER: tl.constexpr,</span>
+<span class="diff-add">+):</span>
+<span class="diff-add">+    # This is mostly duplicated from ns_line_1_kernel, but also loads and adds a block of A</span>
+<span class="diff-add">+    # Performance is slightly slower than ns_line_1_kernel, so we use two separate kernels</span>
+<span class="diff-add">+    pid = tl.program_id(axis=0)</span>
+<span class="diff-add">+    batch_idx, m_idx, n_idx = _pid_to_block(</span>
+<span class="diff-add">+        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Skip blocks that don&#x27;t need to be computed</span>
+<span class="diff-add">+    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span>
+<span class="diff-add">+    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span>
+<span class="diff-add">+    if skip_block_below_diag or skip_block_above_diag:</span>
+<span class="diff-add">+        return</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Index into one matrix of batch</span>
+<span class="diff-add">+    A_ptr += batch_idx * a_stride_b</span>
+<span class="diff-add">+    C_ptr += batch_idx * c_stride_b</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Create pointer arrays for A and A.T</span>
+<span class="diff-add">+    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span>
+<span class="diff-add">+    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span>
+<span class="diff-add">+    offs_k = tl.arange(0, BLOCK_SIZE_K)</span>
+<span class="diff-add">+    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span>
+<span class="diff-add">+    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Accumulate over blocks of K</span>
+<span class="diff-add">+    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span>
+<span class="diff-add">+        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span>
+<span class="diff-add">+        accumulator = tl.dot(a, at, accumulator)</span>
+<span class="diff-add">+        a_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+        at_ptrs += BLOCK_SIZE_K * a_stride_c</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Load block of A to add (corresponds to the current block of C)</span>
+<span class="diff-add">+    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span>
+<span class="diff-add">+    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span>
+<span class="diff-add">+    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Apply alpha and beta</span>
+<span class="diff-add">+    accumulator *= alpha</span>
+<span class="diff-add">+    accumulator += a_add * beta</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    out_dtype = C_ptr.dtype.element_ty</span>
+<span class="diff-add">+    output = accumulator.to(out_dtype)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C</span>
+<span class="diff-add">+    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span>
+<span class="diff-add">+    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span>
+<span class="diff-add">+    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs, output, mask=c_mask)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Store block of C mirrored across the diagonal</span>
+<span class="diff-add">+    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span>
+<span class="diff-add">+    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span>
+<span class="diff-add">+    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def ns_line_2(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span>
+<span class="diff-add">+    &quot;&quot;&quot;</span>
+<span class="diff-add">+    assert A.ndim == 2 or A.ndim == 3</span>
+<span class="diff-add">+    M, K = A.shape[-2:]</span>
+<span class="diff-add">+    assert M == K, &quot;Input matrix must be square&quot;</span>
+<span class="diff-add">+    assert out.size(-2) == M</span>
+<span class="diff-add">+    assert out.size(-1) == M</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    batch_size = A.size(0) if A.ndim == 3 else 1</span>
+<span class="diff-add">+    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span>
+<span class="diff-add">+    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    grid = lambda meta: (</span>
+<span class="diff-add">+        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    ns_line_2_kernel[grid](</span>
+<span class="diff-add">+        A_ptr=A,</span>
+<span class="diff-add">+        C_ptr=out,</span>
+<span class="diff-add">+        M=M,</span>
+<span class="diff-add">+        a_stride_b=input_batch_stride,</span>
+<span class="diff-add">+        a_stride_r=A.stride(-2),</span>
+<span class="diff-add">+        a_stride_c=A.stride(-1),</span>
+<span class="diff-add">+        c_stride_b=output_batch_stride,</span>
+<span class="diff-add">+        c_stride_r=out.stride(-2),</span>
+<span class="diff-add">+        c_stride_c=out.stride(-1),</span>
+<span class="diff-add">+        alpha=alpha,</span>
+<span class="diff-add">+        beta=beta,</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    return out</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span>
+<span class="diff-add">+def newton_schulz_triton(G: torch.Tensor):</span>
+<span class="diff-add">+    a, b, c = (3.4445, -4.7750, 2.0315)</span>
+<span class="diff-add">+    X = G.bfloat16()</span>
+<span class="diff-ctx">     if G.size(-2) &gt; G.size(-1):</span>
+<span class="diff-ctx">         X = X.mT</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     # Ensure spectral norm is at most 1</span>
+<span class="diff-ctx">     X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    # Allocate buffers</span>
+<span class="diff-add">+    X = X.contiguous()</span>
+<span class="diff-add">+    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span>
+<span class="diff-add">+    B = torch.empty_like(A)</span>
+<span class="diff-add">+    C = torch.empty_like(X)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    ns_line_3 = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     # Perform the NS iterations</span>
+<span class="diff-del">-    for _ in range(steps):</span>
+<span class="diff-del">-        A = X @ X.mT</span>
+<span class="diff-del">-        B = b * A + c * A @ A # quintic computation strategy adapted from suggestion by @jxbz, @leloykun, and @YouJiacheng</span>
+<span class="diff-del">-        X = a * X + B @ X</span>
+<span class="diff-add">+    for _ in range(5):</span>
+<span class="diff-add">+        ns_line_1(X, out=A)  # A = X @ X.mT</span>
+<span class="diff-add">+        ns_line_2(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span>
+<span class="diff-add">+        ns_line_3(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span>
+<span class="diff-add">+        X, C = C, X  # Swap references to avoid unnecessary copies</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     if G.size(-2) &gt; G.size(-1):</span>
+<span class="diff-ctx">         X = X.mT</span>
+<span class="diff-ctx">     return X</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+# -----------------------------------------------------------------------------</span>
+<span class="diff-add">+# Muon optimizer</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> class Muon(torch.optim.Optimizer):</span>
+<span class="diff-ctx">     &quot;&quot;&quot;</span>
+<span class="diff-ctx">     Muon - MomentUm Orthogonalized by Newton-schulz</span>
+<span class="diff-hunk">@@ -165,42 +427,177 @@ def step(self):</span>
+<span class="diff-ctx">         # @ryanyang0, and @vagrawal.</span>
+<span class="diff-ctx">         rank = dist.get_rank()</span>
+<span class="diff-ctx">         world_size = dist.get_world_size()</span>
+<span class="diff-del">-        reduce_scatter_futures: list[torch.Future] = []</span>
+<span class="diff-del">-        all_reduce_futures: list[torch.Future] = []</span>
+<span class="diff-add">+        group_infos = []</span>
+<span class="diff-ctx">         for group in self.param_groups:</span>
+<span class="diff-ctx">             params: list[Tensor] = group[&quot;params&quot;]</span>
+<span class="diff-del">-            grad = torch.empty_like(params[-1])</span>
+<span class="diff-del">-            grad_pad = [param.grad for param in params] + [torch.zeros_like(params[-1])] * world_size</span>
+<span class="diff-del">-            for base_i in range(0, len(params), world_size):</span>
+<span class="diff-del">-                if base_i + rank &lt; len(params):</span>
+<span class="diff-del">-                    grad = params[base_i + rank].grad</span>
+<span class="diff-del">-                # This gives strange dynamo warnings</span>
+<span class="diff-del">-                reduce_scatter_futures.append(dist.reduce_scatter(grad, grad_pad[base_i:base_i + world_size], op=dist.ReduceOp.AVG, async_op=True).get_future())</span>
+<span class="diff-add">+            if not params:</span>
+<span class="diff-add">+                continue</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            num_params = len(params)</span>
+<span class="diff-add">+            padded_num_params = (</span>
+<span class="diff-add">+                (num_params + world_size - 1) // world_size * world_size</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            grads_to_stack = [p.grad for p in params]</span>
+<span class="diff-add">+            if padded_num_params &gt; num_params:</span>
+<span class="diff-add">+                padding_grad = torch.zeros_like(params[0].grad)</span>
+<span class="diff-add">+                grads_to_stack.extend(</span>
+<span class="diff-add">+                    [padding_grad] * (padded_num_params - num_params)</span>
+<span class="diff-add">+                )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            stacked_grads = torch.stack(grads_to_stack)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            chunk_size = padded_num_params // world_size</span>
+<span class="diff-add">+            grad_chunk = torch.empty(</span>
+<span class="diff-add">+                (chunk_size, *params[0].grad.shape),</span>
+<span class="diff-add">+                dtype=stacked_grads.dtype,</span>
+<span class="diff-add">+                device=stacked_grads.device,</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            reduce_future = dist.reduce_scatter_tensor(</span>
+<span class="diff-add">+                grad_chunk, stacked_grads, op=dist.ReduceOp.AVG, async_op=True</span>
+<span class="diff-add">+            ).get_future()</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            group_infos.append(</span>
+<span class="diff-add">+                {</span>
+<span class="diff-add">+                    &quot;params&quot;: params,</span>
+<span class="diff-add">+                    &quot;grad_chunk&quot;: grad_chunk,</span>
+<span class="diff-add">+                    &quot;reduce_future&quot;: reduce_future,</span>
+<span class="diff-add">+                    &quot;chunk_size&quot;: chunk_size,</span>
+<span class="diff-add">+                    &quot;padded_num_params&quot;: padded_num_params,</span>
+<span class="diff-add">+                }</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        all_gather_infos = []</span>
+<span class="diff-add">+        # Second pass: wait for gradients, compute updates for the local shard of parameters,</span>
+<span class="diff-add">+        # and launch all async all_gather operations.</span>
+<span class="diff-add">+        for group, info in zip(self.param_groups, group_infos):</span>
+<span class="diff-add">+            info[&quot;reduce_future&quot;].wait()</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            params = info[&quot;params&quot;]</span>
+<span class="diff-add">+            grad_chunk = info[&quot;grad_chunk&quot;]</span>
+<span class="diff-add">+            chunk_size = info[&quot;chunk_size&quot;]</span>
+<span class="diff-add">+            start_idx = rank * chunk_size</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Determine effective LR and WD once per group, assuming constant for same-shaped params.</span>
+<span class="diff-add">+            # This helps in vectorizing operations later.</span>
+<span class="diff-add">+            p_example = params[0]  # All params in a group have the same shape.</span>
+<span class="diff-add">+            eff_lr_val = (</span>
+<span class="diff-add">+                group[&quot;lr&quot;]</span>
+<span class="diff-add">+                * max(1, p_example.size(-2) / p_example.size(-1)) ** 0.5</span>
+<span class="diff-add">+                * getattr(p_example, &quot;lr_mul&quot;, 1.0)</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+            eff_weight_decay_val = (</span>
+<span class="diff-add">+                group[&quot;lr&quot;]</span>
+<span class="diff-add">+                * group[&quot;weight_decay&quot;]</span>
+<span class="diff-add">+                * getattr(p_example, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Prepare a contiguous buffer for the updated parameters for this rank&#x27;s chunk.</span>
+<span class="diff-add">+            # This buffer will serve as the input_tensor for dist.all_gather_into_tensor.</span>
+<span class="diff-add">+            updated_param_chunk = torch.empty(</span>
+<span class="diff-add">+                (chunk_size, *params[0].shape),</span>
+<span class="diff-add">+                dtype=params[0].dtype,</span>
+<span class="diff-add">+                device=params[0].device,</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # List to collect update_grad tensors for batched zeropower computation.</span>
+<span class="diff-add">+            update_grads_for_zeropower = []</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Process each parameter in this rank&#x27;s chunk.</span>
+<span class="diff-add">+            for i in range(chunk_size):</span>
+<span class="diff-add">+                param_idx = start_idx + i</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                if param_idx &gt;= len(params):</span>
+<span class="diff-add">+                    # For padding: Fill the corresponding part of the updated_param_chunk with zeros.</span>
+<span class="diff-add">+                    # These padded entries will not be used by other ranks in the all_gather, but</span>
+<span class="diff-add">+                    # initializing them prevents uninitialized memory access issues.</span>
+<span class="diff-add">+                    updated_param_chunk[i].zero_()</span>
+<span class="diff-add">+                    # Also append a zero tensor for zeropower input if it must be padded.</span>
+<span class="diff-add">+                    update_grads_for_zeropower.append(</span>
+<span class="diff-add">+                        torch.zeros_like(params[0].grad)</span>
+<span class="diff-add">+                    )</span>
+<span class="diff-add">+                    continue</span>
+<span class="diff-add">+                p = params[param_idx]</span>
+<span class="diff-add">+                grad = grad_chunk[</span>
+<span class="diff-add">+                    i</span>
+<span class="diff-add">+                ]  # This gradient corresponds to the current parameter p.</span>
+<span class="diff-add">+                state = self.state[p]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Initialize momentum buffer if not present</span>
+<span class="diff-add">+                if not state:</span>
+<span class="diff-add">+                    state[&quot;momentum_buffer&quot;] = torch.zeros_like(grad)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                momentum_buffer = state[&quot;momentum_buffer&quot;]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Apply momentum update directly to the persistent momentum buffer in-place.</span>
+<span class="diff-add">+                momentum_buffer.lerp_(grad, 1 - group[&quot;momentum&quot;])</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Compute the actual `update_grad` for zeropower. This creates a new tensor.</span>
+<span class="diff-add">+                update_grad = grad.lerp(momentum_buffer, group[&quot;momentum&quot;])</span>
+<span class="diff-add">+                update_grads_for_zeropower.append(update_grad)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Copy the current parameter value into the temporary buffer.</span>
+<span class="diff-add">+                updated_param_chunk[i].copy_(p)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Apply weight decay directly to the buffer.</span>
+<span class="diff-add">+                updated_param_chunk[i].mul_(1 - eff_weight_decay_val)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Stack the individual `update_grad` tensors for efficient batched zeropower computation.</span>
+<span class="diff-add">+            batched_update_grads = torch.stack(update_grads_for_zeropower)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Compute zeropower for the entire chunk in a single, batched call.</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            original_shape = batched_update_grads.shape</span>
+<span class="diff-add">+            if batched_update_grads.ndim &gt; 3:</span>
+<span class="diff-add">+                assert batched_update_grads.ndim == 4</span>
+<span class="diff-add">+                batch = original_shape[0] * original_shape[1]</span>
+<span class="diff-add">+                # Flatten all but the first two dims after batch</span>
+<span class="diff-add">+                d1 = original_shape[2]</span>
+<span class="diff-add">+                d2 = original_shape[3]</span>
+<span class="diff-add">+                batched = batched_update_grads.view(batch, d1, d2)</span>
+<span class="diff-add">+                v_chunk = newton_schulz_triton(batched)</span>
+<span class="diff-add">+                v_chunk = v_chunk.view(original_shape)</span>
+<span class="diff-add">+            else:</span>
+<span class="diff-add">+                v_chunk = newton_schulz_triton(batched_update_grads)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            # Add the computed zeropower update to the parameters in the buffer.</span>
+<span class="diff-add">+            # This loop applies the zeropower output (v_chunk) to the `updated_param_chunk` buffer.</span>
+<span class="diff-add">+            for i in range(chunk_size):</span>
+<span class="diff-add">+                param_idx = start_idx + i</span>
+<span class="diff-add">+                if param_idx &gt;= len(params):  # Skip padded entries again.</span>
+<span class="diff-add">+                    continue</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+                # Add the computed zeropower update to the parameter in the buffer.</span>
+<span class="diff-add">+                updated_param_chunk[i].add_(v_chunk[i], alpha=-eff_lr_val)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            stacked_params = torch.empty(</span>
+<span class="diff-add">+                (info[&quot;padded_num_params&quot;], *params[0].shape),</span>
+<span class="diff-add">+                dtype=params[0].dtype,</span>
+<span class="diff-add">+                device=params[0].device,</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+            gather_future = dist.all_gather_into_tensor(</span>
+<span class="diff-add">+                stacked_params, updated_param_chunk, async_op=True</span>
+<span class="diff-add">+            ).get_future()</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            all_gather_infos.append(</span>
+<span class="diff-add">+                {</span>
+<span class="diff-add">+                    &quot;gather_future&quot;: gather_future,</span>
+<span class="diff-add">+                    &quot;stacked_params&quot;: stacked_params,</span>
+<span class="diff-add">+                    &quot;orig_params&quot;: params,</span>
+<span class="diff-add">+                }</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # Final pass: wait for all_gather to complete and copy results back into original parameter tensors.</span>
+<span class="diff-add">+        for info in all_gather_infos:</span>
+<span class="diff-add">+            info[&quot;gather_future&quot;].wait()</span>
+<span class="diff-add">+            stacked_params = info[&quot;stacked_params&quot;]</span>
+<span class="diff-add">+            orig_params = info[&quot;orig_params&quot;]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            unstacked_params = torch.unbind(stacked_params)</span>
+<span class="diff-add">+            for i, p in enumerate(orig_params):</span>
+<span class="diff-add">+                p.copy_(unstacked_params[i], non_blocking=True)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        idx = 0</span>
+<span class="diff-del">-        for group in self.param_groups:</span>
+<span class="diff-del">-            params: list[Tensor] = group[&quot;params&quot;]</span>
+<span class="diff-del">-            params_pad = params + [torch.empty_like(params[-1])] * world_size</span>
+<span class="diff-del">-            momentum = group[&quot;momentum&quot;]</span>
+<span class="diff-del">-            for base_i in range(0, len(params), world_size):</span>
+<span class="diff-del">-                reduce_scatter_futures[idx].wait()</span>
+<span class="diff-del">-                if base_i + rank &lt; len(params):</span>
+<span class="diff-del">-                    p = params[base_i + rank]</span>
+<span class="diff-del">-                    grad = p.grad</span>
+<span class="diff-del">-                    eff_lr = group[&quot;lr&quot;] * max(1, p.size(-2) / p.size(-1)) ** 0.5 * getattr(p, &quot;lr_mul&quot;, 1.0)</span>
+<span class="diff-del">-                    eff_weight_decay = group[&quot;lr&quot;] * group[&quot;weight_decay&quot;] * getattr(p, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-del">-                    state = self.state[p]</span>
+<span class="diff-del">-                    if len(state) == 0:</span>
+<span class="diff-del">-                        state[&quot;momentum_buffer&quot;] = torch.zeros_like(grad)</span>
+<span class="diff-del">-                    momentum_buffer = state[&quot;momentum_buffer&quot;]</span>
+<span class="diff-del">-                    p.mul_(1 - eff_weight_decay)</span>
+<span class="diff-del">-                    momentum_buffer.lerp_(grad, 1 - momentum)</span>
+<span class="diff-del">-                    grad = grad.lerp_(momentum_buffer, momentum)</span>
+<span class="diff-del">-                    v = zeropower_via_newtonschulz5(grad.bfloat16(), 5)</span>
+<span class="diff-del">-                    p.add_(other=v, alpha=-eff_lr)</span>
+<span class="diff-del">-                idx += 1</span>
+<span class="diff-del">-                all_reduce_futures.append(dist.all_gather(params_pad[base_i:base_i + world_size], params_pad[base_i + rank], async_op=True).get_future())</span>
+<span class="diff-del">-        torch.futures.collect_all(all_reduce_futures).wait()</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> class DistAdam(torch.optim.Optimizer):</span>
+<span class="diff-ctx">     def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-8, weight_decay: float = 0.01):</span>
+<span class="diff-hunk">@@ -221,11 +618,10 @@ def step(self):</span>
+<span class="diff-ctx">         rank = dist.get_rank()</span>
+<span class="diff-ctx">         world_size = dist.get_world_size()</span>
+<span class="diff-ctx">         reduce_scatter_futures: list[torch.Future] = []</span>
+<span class="diff-del">-        all_reduce_futures: list[torch.Future] = []</span>
+<span class="diff-add">+        all_gather_futures: list[torch.Future] = []</span>
+<span class="diff-ctx">         grad_slices = []</span>
+<span class="diff-ctx">         for group in self.param_groups:</span>
+<span class="diff-ctx">             params: list[Tensor] = group[&quot;params&quot;]</span>
+<span class="diff-del">-            grad = torch.empty_like(params[-1])</span>
+<span class="diff-ctx">             for base_i in range(len(params)):</span>
+<span class="diff-ctx">                 grad = params[base_i].grad</span>
+<span class="diff-ctx">                 rank_size = grad.shape[0] // world_size</span>
+<span class="diff-hunk">@@ -249,13 +645,23 @@ def step(self):</span>
+<span class="diff-ctx">                 g_slice = grad_slices[idx]</span>
+<span class="diff-ctx">                 # State init</span>
+<span class="diff-ctx">                 if not state:</span>
+<span class="diff-del">-                    state[&#x27;step&#x27;] = torch.tensor(0, dtype=torch.int64, device=p.device)</span>
+<span class="diff-del">-                    state[&#x27;exp_avg&#x27;] = torch.zeros_like(p_slice)</span>
+<span class="diff-del">-                    state[&#x27;exp_avg_sq&#x27;] = torch.zeros_like(p_slice)</span>
+<span class="diff-del">-                exp_avg = state[&#x27;exp_avg&#x27;]</span>
+<span class="diff-del">-                exp_avg_sq = state[&#x27;exp_avg_sq&#x27;]</span>
+<span class="diff-del">-                state[&#x27;step&#x27;] += 1</span>
+<span class="diff-del">-                t = state[&#x27;step&#x27;]</span>
+<span class="diff-add">+                    state[&quot;step&quot;] = torch.tensor(</span>
+<span class="diff-add">+                        0, dtype=torch.int64, device=p.device</span>
+<span class="diff-add">+                    )</span>
+<span class="diff-add">+                    state[&quot;exp_avg&quot;] = torch.zeros(</span>
+<span class="diff-add">+                        p_slice.shape,</span>
+<span class="diff-add">+                        dtype=torch.bfloat16,</span>
+<span class="diff-add">+                        device=p_slice.device,</span>
+<span class="diff-add">+                    )</span>
+<span class="diff-add">+                    state[&quot;exp_avg_sq&quot;] = torch.zeros(</span>
+<span class="diff-add">+                        p_slice.shape,</span>
+<span class="diff-add">+                        dtype=torch.bfloat16,</span>
+<span class="diff-add">+                        device=p_slice.device,</span>
+<span class="diff-add">+                    )</span>
+<span class="diff-add">+                exp_avg = state[&quot;exp_avg&quot;]</span>
+<span class="diff-add">+                exp_avg_sq = state[&quot;exp_avg_sq&quot;]</span>
+<span class="diff-add">+                state[&quot;step&quot;] += 1</span>
+<span class="diff-add">+                t = state[&quot;step&quot;]</span>
+<span class="diff-ctx">                 # weight decay</span>
+<span class="diff-ctx">                 if wd != 0:</span>
+<span class="diff-ctx">                     eff_weight_decay = lr * wd * getattr(p, &quot;wd_mul&quot;, 1.0)</span>
+<span class="diff-hunk">@@ -272,8 +678,8 @@ def step(self):</span>
+<span class="diff-ctx">                 update = exp_avg.div(denom).mul_(step_size)</span>
+<span class="diff-ctx">                 p_slice.add_(other=update, alpha=-1.0)</span>
+<span class="diff-ctx">                 idx += 1</span>
+<span class="diff-del">-                all_reduce_futures.append(dist.all_gather_into_tensor(p, p_slice, async_op=True).get_future())</span>
+<span class="diff-del">-        torch.futures.collect_all(all_reduce_futures).wait()</span>
+<span class="diff-add">+                all_gather_futures.append(dist.all_gather_into_tensor(p, p_slice, async_op=True).get_future())</span>
+<span class="diff-add">+        torch.futures.collect_all(all_gather_futures).wait()</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-ctx"> # PyTorch nn.Module definitions for the model</span>
+<span class="diff-hunk">@@ -303,84 +709,144 @@ def forward(self, x: Tensor):</span>
+<span class="diff-ctx">         else:</span>
+<span class="diff-ctx">             return F.linear(x, self.weight.type_as(x))</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-class Rotary(nn.Module):</span>
+<span class="diff-del">-    def __init__(self, dim: int, max_seq_len: int):</span>
+<span class="diff-add">+# yarn implementation @classiclarryd</span>
+<span class="diff-add">+class Yarn(nn.Module):</span>
+<span class="diff-add">+    def __init__(self, head_dim, max_seq_len):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-add">+        self.head_dim = head_dim</span>
+<span class="diff-add">+        self.max_seq_len = max_seq_len</span>
+<span class="diff-add">+        self.reset()</span>
+<span class="diff-add">+        </span>
+<span class="diff-add">+    def reset(self):</span>
+<span class="diff-add">+        angular_freq = (1 / 1024) ** torch.linspace(0, 1, steps=self.head_dim//4, dtype=torch.float32, device=device)</span>
+<span class="diff-ctx">         # half-truncate RoPE by @YouJiacheng (w/ base freq tuning)</span>
+<span class="diff-del">-        angular_freq = (1 / 1024) ** torch.linspace(0, 1, steps=dim//4, dtype=torch.float32)</span>
+<span class="diff-del">-        angular_freq = torch.cat([angular_freq, angular_freq.new_zeros(dim//4)])</span>
+<span class="diff-del">-        t = torch.arange(max_seq_len, dtype=torch.float32)</span>
+<span class="diff-del">-        theta = torch.einsum(&quot;i,j -&gt; ij&quot;, t, angular_freq)</span>
+<span class="diff-del">-        self.cos = nn.Buffer(theta.cos(), persistent=False)</span>
+<span class="diff-del">-        self.sin = nn.Buffer(theta.sin(), persistent=False)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-    def forward(self, x_BTHD: Tensor):</span>
+<span class="diff-del">-        assert self.cos.size(0) &gt;= x_BTHD.size(-3)</span>
+<span class="diff-del">-        cos, sin = self.cos[None, :x_BTHD.size(-3), None, :], self.sin[None, :x_BTHD.size(-3), None, :]</span>
+<span class="diff-del">-        x1, x2 = x_BTHD.to(dtype=torch.float32).chunk(2, dim=-1)</span>
+<span class="diff-del">-        y1 = x1 * cos + x2 * sin</span>
+<span class="diff-del">-        y2 = x1 * (-sin) + x2 * cos</span>
+<span class="diff-del">-        return torch.cat((y1, y2), 3).type_as(x_BTHD)</span>
+<span class="diff-add">+        angular_freq = torch.cat([angular_freq, angular_freq.new_zeros(self.head_dim//4)])</span>
+<span class="diff-add">+        t = torch.arange(self.max_seq_len, dtype=torch.float32, device=device)</span>
+<span class="diff-add">+        theta = torch.outer(t, angular_freq)</span>
+<span class="diff-add">+        self.cos = nn.Buffer(</span>
+<span class="diff-add">+            theta.cos().to(torch.bfloat16), persistent=False</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        self.sin = nn.Buffer(</span>
+<span class="diff-add">+            theta.sin().to(torch.bfloat16), persistent=False</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+        self.angular_freq = angular_freq</span>
+<span class="diff-add">+        # start with 0.1, inspired by 0.12 from @leloykun and learnable scalars used by @brendanh0gan https://x.com/hi_tysam/status/1879693583898591283</span>
+<span class="diff-add">+        self.attn_scale = 0.1</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    def apply(self, old_window: int, new_window: int, alpha: int=1, beta: int=32):</span>
+<span class="diff-add">+        rotations = args.block_size * old_window * self.angular_freq / (2 * torch.pi)</span>
+<span class="diff-add">+        scaling_factor = old_window / new_window</span>
+<span class="diff-add">+        interpolation_weight = torch.clamp((rotations - alpha) / (beta - alpha), 0, 1)</span>
+<span class="diff-add">+        self.angular_freq *= scaling_factor + interpolation_weight * (1 - scaling_factor)</span>
+<span class="diff-add">+        t = torch.arange(self.max_seq_len, dtype=torch.float32, device=self.angular_freq.device)</span>
+<span class="diff-add">+        theta = torch.outer(t, self.angular_freq)</span>
+<span class="diff-add">+        self.cos.copy_(theta.cos())</span>
+<span class="diff-add">+        self.sin.copy_(theta.sin())</span>
+<span class="diff-add">+        self.attn_scale *= 0.2 * math.log(new_window / old_window) + 1</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def rotary(x_BTHD: Tensor, cos: Tensor, sin: Tensor):</span>
+<span class="diff-add">+    assert cos.size(0) &gt;= x_BTHD.size(-3)</span>
+<span class="diff-add">+    cos, sin = (</span>
+<span class="diff-add">+        cos[None, : x_BTHD.size(-3), None, :],</span>
+<span class="diff-add">+        sin[None, : x_BTHD.size(-3), None, :],</span>
+<span class="diff-add">+    )</span>
+<span class="diff-add">+    x1, x2 = x_BTHD.chunk(2, dim=-1)</span>
+<span class="diff-add">+    y1 = x1 * cos + x2 * sin</span>
+<span class="diff-add">+    y2 = x1 * (-sin) + x2 * cos</span>
+<span class="diff-add">+    return torch.cat((y1, y2), 3)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+@dataclass</span>
+<span class="diff-add">+class AttnArgs:</span>
+<span class="diff-add">+    ve: torch.Tensor</span>
+<span class="diff-add">+    sa_lambdas: torch.Tensor</span>
+<span class="diff-add">+    seqlens: torch.Tensor</span>
+<span class="diff-add">+    bm_size: int</span>
+<span class="diff-add">+    cos: torch.Tensor</span>
+<span class="diff-add">+    sin: torch.Tensor</span>
+<span class="diff-add">+    attn_scale: float</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> class CausalSelfAttention(nn.Module):</span>
+<span class="diff-del">-    def __init__(self, dim: int, num_heads: int, max_seq_len: int, head_dim=128):</span>
+<span class="diff-add">+    def __init__(self, dim: int, head_dim: int, num_heads: int):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-ctx">         self.num_heads = num_heads</span>
+<span class="diff-ctx">         self.head_dim = head_dim</span>
+<span class="diff-ctx">         hdim = num_heads * head_dim</span>
+<span class="diff-add">+        assert hdim == dim, &quot;num_heads * head_dim must equal model_dim&quot;</span>
+<span class="diff-ctx">         std = 0.5 * (dim ** -0.5)</span>
+<span class="diff-ctx">         bound = (3 ** 0.5) * std # improved init scale by @YouJiacheng</span>
+<span class="diff-ctx">         # merged QKV weights: suggested by many, implemented by @fernbear.bsky.social, and further improved by @YouJiacheng</span>
+<span class="diff-ctx">         # https://x.com/hi_tysam/status/1879699187107033311</span>
+<span class="diff-del">-        self.qkv_w = nn.Parameter(torch.empty(3, hdim, dim).uniform_(-bound, bound))</span>
+<span class="diff-del">-        self.rotary = Rotary(head_dim, max_seq_len)</span>
+<span class="diff-del">-        self.c_proj = CastedLinear(hdim, dim)</span>
+<span class="diff-del">-        self.c_proj.weight.detach().zero_() # zero init suggested by @Grad62304977</span>
+<span class="diff-del">-        # scale the attention logits by given constant, instead of the default head_dim**-0.5, by @leloykun</span>
+<span class="diff-del">-        # inspired by learnable scalars used by @brendanh0gan https://x.com/hi_tysam/status/1879693583898591283</span>
+<span class="diff-del">-        self.attn_scale = 0.12</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-    def forward(self, x: Tensor, ve: Tensor | None, lambdas: Tensor, block_mask: BlockMask):</span>
+<span class="diff-add">+        self.qkvo_w = nn.Parameter(torch.empty(4, hdim, dim))</span>
+<span class="diff-add">+        with torch.no_grad():</span>
+<span class="diff-add">+            self.qkvo_w[:3].uniform_(-bound, bound) # init QKV weights</span>
+<span class="diff-add">+            self.qkvo_w[3].zero_() # init output weights to zero</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # sparse gated attention to enable context based no-op by @classiclarryd</span>
+<span class="diff-add">+        self.attn_gate = CastedLinear(12, num_heads)</span>
+<span class="diff-add">+        self.attn_gate.weight.detach().zero_()</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    def forward(self, x: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">         B, T = x.size(0), x.size(1) # batch size, sequence length</span>
+<span class="diff-del">-        assert B == 1, &quot;Must use batch size = 1 for FlexAttention&quot;</span>
+<span class="diff-del">-        q, k, v = F.linear(x, self.qkv_w.flatten(end_dim=1).type_as(x)).view(B, T, 3 * self.num_heads, self.head_dim).chunk(3, dim=-2)</span>
+<span class="diff-add">+        assert B == 1, &quot;varlen sequences requires B == 1&quot;</span>
+<span class="diff-add">+        assert T % 16 == 0</span>
+<span class="diff-add">+        # unpack attention args</span>
+<span class="diff-add">+        cos, sin = attn_args.cos, attn_args.sin</span>
+<span class="diff-add">+        ve, sa_lambdas = attn_args.ve, attn_args.sa_lambdas</span>
+<span class="diff-add">+        seqlens, attn_scale, bm_size = attn_args.seqlens, attn_args.attn_scale, attn_args.bm_size</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        q, k, v = F.linear(x, self.qkvo_w[:3].flatten(end_dim=1).type_as(x)).view(B, T, 3 * self.num_heads, self.head_dim).chunk(3, dim=-2)</span>
+<span class="diff-ctx">         q, k = norm(q), norm(k) # QK norm @Grad62304977</span>
+<span class="diff-del">-        q, k = self.rotary(q), self.rotary(k)</span>
+<span class="diff-add">+        q, k = rotary(q, cos, sin), rotary(k, cos, sin)</span>
+<span class="diff-ctx">         if ve is not None:</span>
+<span class="diff-del">-            v = lambdas[0] * v + lambdas[1] * ve.view_as(v) # @KoszarskyB &amp; @Grad62304977</span>
+<span class="diff-add">+            v = sa_lambdas[0] * v + sa_lambdas[1] * ve.view_as(v) # @ KoszarskyB &amp; @Grad62304977</span>
+<span class="diff-ctx">         else: # skip mid-layers token value embeddings by @YouJiacheng</span>
+<span class="diff-del">-            v = lambdas[0] * v</span>
+<span class="diff-del">-        y = flex_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), block_mask=block_mask, scale=self.attn_scale).transpose(1, 2)</span>
+<span class="diff-add">+            v = sa_lambdas[0] * v</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        max_len = args.train_max_seq_len if self.training else (args.val_batch_size // (grad_accum_steps * world_size))</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # use flash_attn over flex_attn @varunneal. flash_attn_varlen suggested by @YouJiacheng</span>
+<span class="diff-add">+        y = flash_attn_varlen_func(q[0], k[0], v[0], cu_seqlens_q=seqlens, cu_seqlens_k=seqlens, max_seqlen_q=max_len, max_seqlen_k=max_len,</span>
+<span class="diff-add">+                                   causal=True, softmax_scale=attn_scale, window_size=(bm_size, 0))</span>
+<span class="diff-add">+        y = y.view(B, T, self.num_heads, self.head_dim)</span>
+<span class="diff-add">+        y = y * torch.sigmoid(self.attn_gate(x[..., :self.attn_gate.weight.size(-1)])).view(B, T, self.num_heads, 1)</span>
+<span class="diff-ctx">         y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side</span>
+<span class="diff-del">-        y = self.c_proj(y)</span>
+<span class="diff-add">+        y = F.linear(y, self.qkvo_w[3].type_as(y))</span>
+<span class="diff-ctx">         return y</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> class MLP(nn.Module):</span>
+<span class="diff-ctx">     def __init__(self, dim: int):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-ctx">         hdim = 4 * dim</span>
+<span class="diff-del">-        self.c_fc = CastedLinear(dim, hdim)</span>
+<span class="diff-del">-        self.c_proj = CastedLinear(hdim, dim)</span>
+<span class="diff-del">-        self.c_proj.weight.detach().zero_() # zero init suggested by @Grad62304977</span>
+<span class="diff-add">+        # make both matrices have the same shape because optimizer sorts params by shape</span>
+<span class="diff-add">+        # 2 matrices x 12 layers = 24 total, which is divisible by 8 GPU world size</span>
+<span class="diff-add">+        self.c_fc = nn.Parameter(torch.empty(dim, hdim))</span>
+<span class="diff-add">+        self.c_proj = nn.Parameter(torch.empty(dim, hdim))</span>
+<span class="diff-add">+        std = 0.5 * (dim ** -0.5)</span>
+<span class="diff-add">+        bound = (3 ** 0.5) * std # improved init scale by @YouJiacheng</span>
+<span class="diff-add">+        with torch.no_grad():</span>
+<span class="diff-add">+            self.c_fc.uniform_(-bound, bound)</span>
+<span class="diff-add">+            self.c_proj.zero_() # zero init suggested by @Grad62304977</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     def forward(self, x: Tensor):</span>
+<span class="diff-del">-        x = self.c_fc(x)</span>
+<span class="diff-add">+        x = F.linear(x, self.c_fc.T.type_as(x))</span>
+<span class="diff-ctx">         x = F.relu(x).square() # https://arxiv.org/abs/2109.08668v2; ~1-2% better than GELU; suggested by @SKYLINEZ007 and @Grad62304977</span>
+<span class="diff-del">-        x = self.c_proj(x)</span>
+<span class="diff-add">+        x = F.linear(x, self.c_proj.type_as(x))</span>
+<span class="diff-ctx">         return x</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> class Block(nn.Module):</span>
+<span class="diff-del">-    def __init__(self, dim: int, num_heads: int, max_seq_len: int, layer_idx: int):</span>
+<span class="diff-add">+    def __init__(self, dim: int, head_dim: int, num_heads: int, layer_idx: int):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-ctx">         # skip attention of blocks.7 (the 8th layer) by @YouJiacheng</span>
+<span class="diff-del">-        self.attn = CausalSelfAttention(dim, num_heads, max_seq_len) if layer_idx != 7 else None</span>
+<span class="diff-del">-        self.mlp = MLP(dim)</span>
+<span class="diff-add">+        self.attn = CausalSelfAttention(dim, head_dim, num_heads) if layer_idx not in [0, 7] else None</span>
+<span class="diff-add">+        # skip MLP blocks for first MLP layer by @EmelyanenkoK</span>
+<span class="diff-add">+        self.mlp = MLP(dim) if layer_idx != 0 else None</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-    def forward(self, x: Tensor, ve: Tensor | None, x0: Tensor, lambdas: Tensor, sa_lambdas: Tensor, block_mask: BlockMask):</span>
+<span class="diff-add">+    def forward(self, x: Tensor, x0: Tensor, lambdas: Tensor, attn_args: AttnArgs):</span>
+<span class="diff-ctx">         x = lambdas[0] * x + lambdas[1] * x0</span>
+<span class="diff-ctx">         if self.attn is not None:</span>
+<span class="diff-del">-            x = x + self.attn(norm(x), ve, sa_lambdas, block_mask)</span>
+<span class="diff-del">-        x = x + self.mlp(norm(x))</span>
+<span class="diff-add">+            x = x + self.attn(norm(x), attn_args)</span>
+<span class="diff-add">+        if self.mlp is not None:</span>
+<span class="diff-add">+            x = x + self.mlp(norm(x))</span>
+<span class="diff-ctx">         return x</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-hunk">@@ -390,88 +856,69 @@ def next_multiple_of_n(v: float | int, *, n: int):</span>
+<span class="diff-ctx">     return next(x for x in range(n, int(v) + 1 + n, n) if x &gt;= v)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> class GPT(nn.Module):</span>
+<span class="diff-del">-    def __init__(self, vocab_size: int, num_layers: int, num_heads: int, model_dim: int, max_seq_len: int):</span>
+<span class="diff-add">+    def __init__(self, vocab_size: int, num_layers: int, num_heads: int, head_dim: int, model_dim: int, max_seq_len: int):</span>
+<span class="diff-ctx">         super().__init__()</span>
+<span class="diff-ctx">         vocab_size = next_multiple_of_n(vocab_size, n=128)</span>
+<span class="diff-ctx">         self.embed = nn.Embedding(vocab_size, model_dim)</span>
+<span class="diff-add">+        self.smear_gate = CastedLinear(12, 1)</span>
+<span class="diff-add">+        self.smear_gate.weight.detach().zero_()</span>
+<span class="diff-ctx">         # token value embeddings by @KoszarskyB - inspired by @Grad62304977&#x27;s value residual implementation following https://arxiv.org/abs/2410.17897</span>
+<span class="diff-ctx">         # value embedding code simplification inspired by @ragulpr https://github.com/KellerJordan/modded-nanogpt/pull/78</span>
+<span class="diff-ctx">         self.value_embeds = nn.ModuleList([nn.Embedding(vocab_size, model_dim) for _ in range(3)])</span>
+<span class="diff-del">-        self.blocks = nn.ModuleList([Block(model_dim, num_heads, max_seq_len, i) for i in range(num_layers)])</span>
+<span class="diff-add">+        self.blocks = nn.ModuleList([Block(model_dim, head_dim, num_heads, i) for i in range(num_layers)])</span>
+<span class="diff-add">+        self.yarn = Yarn(head_dim, max_seq_len)</span>
+<span class="diff-ctx">         # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.</span>
+<span class="diff-ctx">         # suggested to me by @Grad62304977. this originates from Karpathy&#x27;s experiments.</span>
+<span class="diff-del">-        self.lm_head = CastedLinear(model_dim, vocab_size, use_fp8=True, x_s=(model_dim**0.5)/448, w_s=24/448, grad_s=1/448)</span>
+<span class="diff-add">+        use_fp8 = not os.environ.get(&quot;DISABLE_FP8&quot;, False)</span>
+<span class="diff-add">+        self.lm_head = CastedLinear(model_dim, vocab_size, use_fp8=use_fp8, x_s=(model_dim**0.5)/448, w_s=2**-9, grad_s=1/448)</span>
+<span class="diff-ctx">         self.lm_head.weight.detach().zero_() # @Grad62304977</span>
+<span class="diff-ctx">         # Add learnable skip connection weights for decoder layers</span>
+<span class="diff-ctx">         assert num_layers % 2 == 0</span>
+<span class="diff-del">-        pad = (-num_layers * 5) % dist.get_world_size()</span>
+<span class="diff-del">-        self.scalars = nn.Parameter(torch.cat([</span>
+<span class="diff-del">-            torch.ones(num_layers), # skip_weights</span>
+<span class="diff-del">-            *[torch.tensor([1.0, 0.0]) for _ in range(num_layers)], # block lambdas</span>
+<span class="diff-del">-            *[torch.tensor([0.5, 0.5]) for _ in range(num_layers)], # SA lambdas</span>
+<span class="diff-del">-            torch.ones(pad),</span>
+<span class="diff-del">-        ]))</span>
+<span class="diff-add">+        pad = (-num_layers * 6) % dist.get_world_size()</span>
+<span class="diff-add">+        self.scalars = nn.Parameter(</span>
+<span class="diff-add">+            torch.cat(</span>
+<span class="diff-add">+                [</span>
+<span class="diff-add">+                    -1.5</span>
+<span class="diff-add">+                    * torch.ones(num_layers),  # skip_weights -&gt; σ(-1.5) ≈ 0.18</span>
+<span class="diff-add">+                    *[</span>
+<span class="diff-add">+                        torch.tensor([1.0, 0.0]) for _ in range(num_layers)</span>
+<span class="diff-add">+                    ],  # block lambdas</span>
+<span class="diff-add">+                    *[</span>
+<span class="diff-add">+                        torch.tensor([0.5, 0.5]) for _ in range(num_layers)</span>
+<span class="diff-add">+                    ],  # SA lambdas</span>
+<span class="diff-add">+                    torch.zeros(num_layers), #extra zeros params for smear_lambda</span>
+<span class="diff-add">+                    torch.ones(pad),</span>
+<span class="diff-add">+                ]</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+        )</span>
+<span class="diff-ctx">         # set learning rates</span>
+<span class="diff-ctx">         for param in self.embed.parameters():</span>
+<span class="diff-ctx">             param.lr_mul = 75.</span>
+<span class="diff-ctx">         for param in self.value_embeds.parameters():</span>
+<span class="diff-ctx">             param.lr_mul = 75.</span>
+<span class="diff-del">-        self.lm_head.weight.lr_mul = 27.5</span>
+<span class="diff-add">+        self.lm_head.weight.lr_mul = 1.0</span>
+<span class="diff-ctx">         self.scalars.lr_mul = 5.0</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-    def create_blockmasks(self, input_seq: Tensor, sliding_window_num_blocks: Tensor):</span>
+<span class="diff-del">-        BLOCK_SIZE = 128</span>
+<span class="diff-del">-        docs = (input_seq == 50256).cumsum(0)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-        def document_causal(b, h, q_idx, kv_idx):</span>
+<span class="diff-del">-            causal_mask = q_idx &gt;= kv_idx</span>
+<span class="diff-del">-            document_mask = docs[q_idx] == docs[kv_idx]</span>
+<span class="diff-del">-            return causal_mask &amp; document_mask</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-        def dense_to_ordered(dense_blockmask: Tensor):</span>
+<span class="diff-del">-            num_blocks = dense_blockmask.sum(dim=-1, dtype=torch.int32)</span>
+<span class="diff-del">-            indices = dense_blockmask.argsort(dim=-1, descending=False, stable=True).flip(-1).to(torch.int32)</span>
+<span class="diff-del">-            return num_blocks[None, None].contiguous(), indices[None, None].contiguous()</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-        # manual block mask creation by @YouJiacheng</span>
+<span class="diff-del">-        assert len(input_seq) % BLOCK_SIZE == 0</span>
+<span class="diff-del">-        NUM_BLOCKS = len(input_seq) // BLOCK_SIZE</span>
+<span class="diff-del">-        block_idx = torch.arange(NUM_BLOCKS, dtype=torch.int32, device=&quot;cuda&quot;)</span>
+<span class="diff-del">-        causal_blockmask_any = block_idx[:, None] &gt;= block_idx</span>
+<span class="diff-del">-        causal_blockmask_all = block_idx[:, None] &gt; block_idx</span>
+<span class="diff-del">-        docs_low = docs.view(-1, BLOCK_SIZE)[:, 0].contiguous()</span>
+<span class="diff-del">-        docs_high = docs.view(-1, BLOCK_SIZE)[:, -1].contiguous()</span>
+<span class="diff-del">-        document_blockmask_any = (docs_low[:, None] &lt;= docs_high) &amp; (docs_high[:, None] &gt;= docs_low)</span>
+<span class="diff-del">-        document_blockmask_all = (docs_low[:, None] == docs_high) &amp; (docs_high[:, None] == docs_low)</span>
+<span class="diff-del">-        blockmask_any = causal_blockmask_any &amp; document_blockmask_any</span>
+<span class="diff-del">-        blockmask_all = causal_blockmask_all &amp; document_blockmask_all</span>
+<span class="diff-del">-        partial_kv_num_blocks, partial_kv_indices = dense_to_ordered(blockmask_any &amp; ~blockmask_all)</span>
+<span class="diff-del">-        full_kv_num_blocks, full_kv_indices = dense_to_ordered(blockmask_all)</span>
+<span class="diff-del">-        def build_bm(window_size_blocks: Tensor) -&gt; BlockMask:</span>
+<span class="diff-del">-            return BlockMask.from_kv_blocks(</span>
+<span class="diff-del">-                torch.clamp_max(partial_kv_num_blocks, torch.clamp_min(window_size_blocks - full_kv_num_blocks, 1)),</span>
+<span class="diff-del">-                partial_kv_indices,</span>
+<span class="diff-del">-                torch.clamp_max(full_kv_num_blocks, window_size_blocks - 1),</span>
+<span class="diff-del">-                full_kv_indices,</span>
+<span class="diff-del">-                BLOCK_SIZE=BLOCK_SIZE,</span>
+<span class="diff-del">-                mask_mod=document_causal,</span>
+<span class="diff-del">-            )</span>
+<span class="diff-del">-        # Long-short SWA block masks by @leloykun &amp; @YouJiacheng, adapated from suggestion by @Grad62304977, following Gemma 2 paper</span>
+<span class="diff-del">-        return build_bm(sliding_window_num_blocks), build_bm(sliding_window_num_blocks // 2)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-    def forward(self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_blocks: Tensor):</span>
+<span class="diff-add">+    def forward(self, input_seq: Tensor, target_seq: Tensor, seqlens: Tensor, ws_short: int, ws_long: int):</span>
+<span class="diff-ctx">         assert input_seq.ndim == 1</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         ve = [value_embed(input_seq) for value_embed in self.value_embeds]</span>
+<span class="diff-ctx">         # 012 ... 012 structure on token value embeddings by @YouJiacheng, improved on @leloykun&#x27;s U-net structure</span>
+<span class="diff-del">-        ve = [ve[0], ve[1], ve[2]] + [None] * (len(self.blocks) - 6) + [ve[0], ve[1], ve[2]]</span>
+<span class="diff-add">+        ve = [None, ve[1], ve[2]] + [None] * (len(self.blocks) - 6) + [ve[0], ve[1], ve[2]]</span>
+<span class="diff-ctx">         assert len(ve) == len(self.blocks)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        long_bm, short_bm = self.create_blockmasks(input_seq, sliding_window_num_blocks)</span>
+<span class="diff-del">-        block_masks = [long_bm, short_bm, short_bm, short_bm, long_bm, short_bm, short_bm, long_bm, short_bm, short_bm, short_bm, long_bm]</span>
+<span class="diff-del">-        assert len(block_masks) == len(self.blocks)</span>
+<span class="diff-add">+        short_bm = ws_short * args.block_size</span>
+<span class="diff-add">+        long_bm = ws_long * args.block_size</span>
+<span class="diff-add">+        bm_sizes = [None, short_bm, short_bm, short_bm, long_bm, short_bm, short_bm, None, short_bm, short_bm, short_bm, long_bm]</span>
+<span class="diff-add">+        assert len(bm_sizes) == len(self.blocks)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        x = x0 = norm(self.embed(input_seq)[None]) # use of norm here by @Grad62304977</span>
+<span class="diff-add">+        x = self.embed(input_seq)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        # smear token embed forward 1 position @classiclarryd</span>
+<span class="diff-add">+        smear_lambda = self.scalars[5 * len(self.blocks)]</span>
+<span class="diff-add">+        smear_gate_out = smear_lambda * torch.sigmoid(self.smear_gate(x[1:, :self.smear_gate.weight.size(-1)]))</span>
+<span class="diff-add">+        x = torch.cat([x[:1], x[1:] + smear_gate_out * x[:-1]])</span>
+<span class="diff-add">+        x = x0 = norm(x[None])</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         # U-net design by @brendanh0gan</span>
+<span class="diff-ctx">         skip_connections = []</span>
+<span class="diff-hunk">@@ -481,17 +928,28 @@ def forward(self, input_seq: Tensor, target_seq: Tensor, sliding_window_num_bloc</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         n = len(self.blocks) // 2</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-        for i in range(len(self.blocks)):</span>
+<span class="diff-del">-            if i &gt;= n:</span>
+<span class="diff-del">-                x = x + skip_weights[i - n] * skip_connections.pop()</span>
+<span class="diff-del">-            x = self.blocks[i](x, ve[i], x0, lambdas[i], sa_lambdas[i], block_masks[i])</span>
+<span class="diff-add">+        # skip layer zero</span>
+<span class="diff-add">+        for i in range(1,len(self.blocks)):</span>
+<span class="diff-add">+            attn_args = AttnArgs(</span>
+<span class="diff-add">+                ve=ve[i],</span>
+<span class="diff-add">+                sa_lambdas=sa_lambdas[i],</span>
+<span class="diff-add">+                seqlens=seqlens,</span>
+<span class="diff-add">+                bm_size=bm_sizes[i],</span>
+<span class="diff-add">+                cos=self.yarn.cos,</span>
+<span class="diff-add">+                sin=self.yarn.sin,</span>
+<span class="diff-add">+                attn_scale=self.yarn.attn_scale</span>
+<span class="diff-add">+            )</span>
+<span class="diff-add">+            if i &gt;= n and i&lt;11:</span>
+<span class="diff-add">+                gate = torch.sigmoid(skip_weights[i - n])  # in (0, 1)</span>
+<span class="diff-add">+                x = x + gate * skip_connections.pop()</span>
+<span class="diff-add">+            x = self.blocks[i](x, x0, lambdas[i], attn_args)</span>
+<span class="diff-ctx">             if i &lt; n:</span>
+<span class="diff-ctx">                 skip_connections.append(x)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">         x = norm(x)</span>
+<span class="diff-ctx">         logits = self.lm_head(x).float()</span>
+<span class="diff-ctx">         # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)</span>
+<span class="diff-del">-        logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))</span>
+<span class="diff-add">+        logits = 30 * torch.sigmoid(logits / 7.5)</span>
+<span class="diff-ctx">         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq, reduction=&quot;sum&quot; if self.training else &quot;mean&quot;)</span>
+<span class="diff-ctx">         return loss</span>
+<span class="diff-ctx"> </span>
+<span class="diff-hunk">@@ -510,68 +968,204 @@ def _load_data_shard(file: Path):</span>
+<span class="diff-ctx">         assert nbytes == 2 * num_tokens, &quot;number of tokens read does not match header&quot;</span>
+<span class="diff-ctx">     return tokens</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-# find world_size starting indicies, such that each begins with token 50256 and local_batches don&#x27;t overlap</span>
+<span class="diff-del">-def find_batch_starts(tokens: Tensor, pos: int, local_batch_size: int, max_batch_span: int):</span>
+<span class="diff-del">-    boundary_mask = tokens[pos : pos + max_batch_span] == 50256</span>
+<span class="diff-del">-    boundary_positions = torch.nonzero(boundary_mask, as_tuple=False).squeeze(-1) + pos</span>
+<span class="diff-del">-    start = boundary_positions[0].item()</span>
+<span class="diff-del">-    starts = []</span>
+<span class="diff-del">-    for i in range(1, len(boundary_positions)):</span>
+<span class="diff-del">-        end = boundary_positions[i].item() </span>
+<span class="diff-del">-        if end - start &gt;= local_batch_size:</span>
+<span class="diff-del">-            starts.append(start) # append start once end pos is confirmed</span>
+<span class="diff-del">-            if len(starts) == dist.get_world_size():</span>
+<span class="diff-del">-                return starts, end - pos</span>
+<span class="diff-del">-            start = end</span>
+<span class="diff-del">-    assert False # increase max_batch_span if necessary</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-def distributed_data_generator(filename_pattern: str, batch_size: int, align_to_bos: bool):</span>
+<span class="diff-del">-    rank = dist.get_rank()</span>
+<span class="diff-del">-    world_size = dist.get_world_size()</span>
+<span class="diff-add">+BOS_ID = 50256</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+class BOSFinder:</span>
+<span class="diff-add">+    # Helper for getting sequences that start at the beginning of documents by @varunneal based on work by @classiclarryd</span>
+<span class="diff-add">+    def __init__(self, tokens: Tensor, world_size: int = 1, quickload: bool = False):</span>
+<span class="diff-add">+        # Precompute BOS positions once per shard</span>
+<span class="diff-add">+        self.tokens=tokens</span>
+<span class="diff-add">+        self.size = tokens.numel()</span>
+<span class="diff-add">+        self.quickload = quickload</span>
+<span class="diff-add">+        if quickload:</span>
+<span class="diff-add">+            # only scan first 4 million tokens, then kickoff async thread to scan rest</span>
+<span class="diff-add">+            self.bos_idx = (tokens[:4_000_000] == BOS_ID).nonzero(as_tuple=True)[0].to(torch.int64).cpu().numpy()</span>
+<span class="diff-add">+            self.thread = None</span>
+<span class="diff-add">+            self.ready = threading.Event()</span>
+<span class="diff-add">+            self.start()</span>
+<span class="diff-add">+        else:</span>
+<span class="diff-add">+            self.bos_idx = (tokens == BOS_ID).nonzero(as_tuple=True)[0].to(torch.int64).cpu().numpy()</span>
+<span class="diff-add">+        self.i = 0</span>
+<span class="diff-add">+        self.world_size = world_size</span>
+<span class="diff-add">+        self.batch_iter = 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    def _load(self):</span>
+<span class="diff-add">+        self.bos_idx_async = (self.tokens == BOS_ID).nonzero(as_tuple=True)[0].to(torch.int64).cpu().numpy()</span>
+<span class="diff-add">+        self.ready.set()</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    def start(self):</span>
+<span class="diff-add">+        self.ready.clear()</span>
+<span class="diff-add">+        self.thread = threading.Thread(target=self._load)</span>
+<span class="diff-add">+        self.thread.start()</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    def get(self):</span>
+<span class="diff-add">+        if self.thread:</span>
+<span class="diff-add">+            self.ready.wait()</span>
+<span class="diff-add">+            self.thread.join()</span>
+<span class="diff-add">+        self.bos_idx = self.bos_idx_async</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    def next_batch(self, num_tokens_local: int, max_seq_len: int):</span>
+<span class="diff-add">+        # if quickload was used, repoint to the full dataset after 5 batches</span>
+<span class="diff-add">+        if self.quickload and self.batch_iter==5:</span>
+<span class="diff-add">+            self.get()</span>
+<span class="diff-add">+        n = len(self.bos_idx)</span>
+<span class="diff-add">+        starts = [[] for _ in range(self.world_size)]</span>
+<span class="diff-add">+        ends = [[] for _ in range(self.world_size)]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        idx = self.i</span>
+<span class="diff-add">+        for r in range(self.world_size):</span>
+<span class="diff-add">+            cur_len = 0</span>
+<span class="diff-add">+            while cur_len &lt;= num_tokens_local:</span>
+<span class="diff-add">+                if idx &gt;= n:</span>
+<span class="diff-add">+                    raise StopIteration(f&quot;Insufficient BOS ahead of position {cur}; hit tail of shard.&quot;)</span>
+<span class="diff-add">+                cur = self.bos_idx[idx]</span>
+<span class="diff-add">+                starts[r].append(cur)</span>
+<span class="diff-add">+                end = min(self.bos_idx[idx + 1] if idx + 1 &lt; n else self.size,</span>
+<span class="diff-add">+                          cur + max_seq_len,</span>
+<span class="diff-add">+                          cur + num_tokens_local - cur_len + 1)</span>
+<span class="diff-add">+                ends[r].append(end)</span>
+<span class="diff-add">+                cur_len += end - cur</span>
+<span class="diff-add">+                idx += 1</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            assert cur_len == num_tokens_local + 1</span>
+<span class="diff-add">+        self.i = idx</span>
+<span class="diff-add">+        self.batch_iter+=1</span>
+<span class="diff-add">+        return starts, ends</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+class DataPreloader:</span>
+<span class="diff-add">+    # Helper for asynchronously loading next shard and indexing bos tokens</span>
+<span class="diff-add">+    def __init__(self, file_iter, world_size: int = 1):</span>
+<span class="diff-add">+        self.file_iter = file_iter</span>
+<span class="diff-add">+        self.world_size = world_size</span>
+<span class="diff-add">+        self.thread = None</span>
+<span class="diff-add">+        self.data = None</span>
+<span class="diff-add">+        self.ready = threading.Event()</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    def _load(self):</span>
+<span class="diff-add">+        tokens = _load_data_shard(next(self.file_iter))</span>
+<span class="diff-add">+        self.data = (tokens, BOSFinder(tokens, self.world_size))</span>
+<span class="diff-add">+        self.ready.set()</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    def start(self):</span>
+<span class="diff-add">+        self.ready.clear()</span>
+<span class="diff-add">+        self.thread = threading.Thread(target=self._load)</span>
+<span class="diff-add">+        self.thread.start()</span>
+<span class="diff-add">+    </span>
+<span class="diff-add">+    def get(self):</span>
+<span class="diff-add">+        if self.thread:</span>
+<span class="diff-add">+            self.ready.wait()</span>
+<span class="diff-add">+            self.thread.join()</span>
+<span class="diff-add">+        return self.data</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def distributed_data_generator(filename_pattern: str, num_tokens: int, max_seq_len: int, grad_accum_steps: int = 1, align_to_bos: bool = True):</span>
+<span class="diff-add">+    # align_to_bos: each sequence begins with Beginning of Sequence token, sequences truncated to max_seq_len</span>
+<span class="diff-add">+    rank = dist.get_rank() if dist.is_initialized() else 0</span>
+<span class="diff-add">+    world_size = dist.get_world_size() if dist.is_initialized() else 1</span>
+<span class="diff-add">+    assert num_tokens % (world_size * grad_accum_steps) == 0, &quot;Batch size must be divisible by world size&quot;</span>
+<span class="diff-add">+    num_tokens = num_tokens // grad_accum_steps</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     files = [Path(file) for file in sorted(glob.glob(filename_pattern))]</span>
+<span class="diff-del">-    assert batch_size % world_size == 0</span>
+<span class="diff-del">-    local_batch_size = batch_size // world_size</span>
+<span class="diff-del">-    file_iter = iter(files) # use itertools.cycle(files) instead if you want to do multi-epoch training</span>
+<span class="diff-del">-    tokens, pos = _load_data_shard(next(file_iter)), 0</span>
+<span class="diff-del">-    max_batch_span = 2 * batch_size if align_to_bos else batch_size # provide buffer to handle samples up to length local_batch_size</span>
+<span class="diff-add">+    if not files:</span>
+<span class="diff-add">+        raise FileNotFoundError(f&quot;No files found for pattern: {filename_pattern}&quot;)</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+    file_iter = iter(files)  # Use itertools.cycle(files) for multi-epoch training</span>
+<span class="diff-add">+    tokens = _load_data_shard(next(file_iter))</span>
+<span class="diff-add">+    if align_to_bos:</span>
+<span class="diff-add">+        finder = BOSFinder(tokens, world_size=world_size, quickload=True)</span>
+<span class="diff-add">+        preloader = DataPreloader(file_iter, world_size)</span>
+<span class="diff-add">+        preloader.start()</span>
+<span class="diff-add">+    else:</span>
+<span class="diff-add">+        pos = 0  # for unaligned case</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">     while True:</span>
+<span class="diff-del">-        if pos + max_batch_span + 1 &gt;= len(tokens):</span>
+<span class="diff-del">-            tokens, pos = _load_data_shard(next(file_iter)), 0</span>
+<span class="diff-add">+        num_tokens_local = num_tokens // world_size</span>
+<span class="diff-add">+        max_num_docs = next_multiple_of_n(num_tokens_local // 300, n=128)  # median doc length is ~400</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         if align_to_bos:</span>
+<span class="diff-del">-            batch_starts, batch_span = find_batch_starts(tokens, pos, local_batch_size, max_batch_span)</span>
+<span class="diff-del">-            start_idx = batch_starts[rank]</span>
+<span class="diff-add">+            try:</span>
+<span class="diff-add">+                seq_starts, seq_ends = finder.next_batch(num_tokens_local, max_seq_len)</span>
+<span class="diff-add">+                start_idxs, end_idxs = torch.tensor(seq_starts[rank]), torch.tensor(seq_ends[rank])</span>
+<span class="diff-add">+            except StopIteration:</span>
+<span class="diff-add">+                # This shard is exhausted, load the next one in the next loop iteration.</span>
+<span class="diff-add">+                tokens, finder = preloader.get()</span>
+<span class="diff-add">+                preloader.start()</span>
+<span class="diff-add">+                continue</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            buf = torch.cat([tokens[i:j] for i, j in zip(start_idxs, end_idxs)])</span>
+<span class="diff-add">+            _inputs = buf[:-1]</span>
+<span class="diff-add">+            _targets = buf[1:]</span>
+<span class="diff-add">+            end_idxs[-1] -= 1  # last document was too long to account for _targets offset</span>
+<span class="diff-add">+            cum_lengths = (end_idxs - start_idxs).cumsum(0)</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx">         else:</span>
+<span class="diff-del">-            batch_span = batch_size</span>
+<span class="diff-del">-            start_idx = pos + rank * local_batch_size</span>
+<span class="diff-del">-        buf = tokens[start_idx:][:local_batch_size + 1]</span>
+<span class="diff-del">-        inputs = buf[:-1].to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True) # no sync on host side;</span>
+<span class="diff-del">-        targets = buf[1:].to(device=&quot;cuda&quot;, dtype=torch.int64, non_blocking=True) # H2D in another stream isn&#x27;t helpful.</span>
+<span class="diff-del">-        pos += batch_span</span>
+<span class="diff-del">-        yield inputs, targets</span>
+<span class="diff-add">+            if pos + num_tokens + 1 &gt;= len(tokens):  # should not occur for val data</span>
+<span class="diff-add">+                tokens, pos = _load_data_shard(next(file_iter)), 0</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            pos_local = pos + rank * num_tokens_local</span>
+<span class="diff-add">+            buf = tokens[pos_local: pos_local + num_tokens_local + 1]</span>
+<span class="diff-add">+            _inputs = buf[:-1].view(num_tokens_local, )</span>
+<span class="diff-add">+            _targets = buf[1:].view(num_tokens_local, )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+            cum_lengths = torch.nonzero(_inputs == BOS_ID)[:, 0]</span>
+<span class="diff-add">+            pos += num_tokens</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        _cum_lengths = torch.full((max_num_docs,), num_tokens_local)</span>
+<span class="diff-add">+        _cum_lengths[0] = 0</span>
+<span class="diff-add">+        _cum_lengths[1:len(cum_lengths) + 1] = cum_lengths</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        new_params = yield (</span>
+<span class="diff-add">+            _inputs.to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True),</span>
+<span class="diff-add">+            _targets.to(device=&quot;cuda&quot;, dtype=torch.int64, non_blocking=True),</span>
+<span class="diff-add">+            _cum_lengths.to(device=&quot;cuda&quot;, dtype=torch.int32, non_blocking=True)</span>
+<span class="diff-add">+        )</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+        if new_params is not None:</span>
+<span class="diff-add">+            # makes it possible for generator to receive new (num_tokens, max_seq_len, grad_accum_steps) via .send()</span>
+<span class="diff-add">+            new_num_tokens, new_max_seq_len, new_grad_accum_steps = new_params</span>
+<span class="diff-add">+            assert new_num_tokens % (world_size * grad_accum_steps) == 0, &quot;Num tokens must be divisible by world size&quot;</span>
+<span class="diff-add">+            num_tokens = new_num_tokens</span>
+<span class="diff-add">+            max_seq_len = new_max_seq_len</span>
+<span class="diff-add">+            grad_accum_steps = new_grad_accum_steps</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # -----------------------------------------------------------------------------</span>
+<span class="diff-ctx"> # int main</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> @dataclass</span>
+<span class="diff-ctx"> class Hyperparameters:</span>
+<span class="diff-ctx">     # data</span>
+<span class="diff-del">-    train_files = &quot;data/fineweb10B/fineweb_train_*.bin&quot; # input .bin to train on</span>
+<span class="diff-del">-    val_files = &quot;data/fineweb10B/fineweb_val_*.bin&quot; # input .bin to eval validation loss on</span>
+<span class="diff-del">-    val_tokens = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span>
+<span class="diff-del">-    train_seq_len = 48*1024 # FlexAttention sequence length</span>
+<span class="diff-del">-    val_seq_len = 4*64*1024 # FlexAttention sequence length for validation</span>
+<span class="diff-add">+    train_files: str = &quot;data/fineweb10B/fineweb_train_*.bin&quot; # input .bin to train on</span>
+<span class="diff-add">+    val_files: str = &quot;data/fineweb10B/fineweb_val_*.bin&quot; # input .bin to eval validation loss on</span>
+<span class="diff-add">+    val_tokens: int = 10485760 # how many tokens of validation data? it&#x27;s important to keep this fixed for consistent comparisons</span>
+<span class="diff-add">+    train_batch_size: int = 2048 * 24 * 8</span>
+<span class="diff-add">+    train_max_seq_len: int = 128 * 16</span>
+<span class="diff-add">+    val_batch_size: int = 4 * 64 * 1024 * 8</span>
+<span class="diff-ctx">     # optimization</span>
+<span class="diff-del">-    num_iterations = 1750 # number of iterations to run</span>
+<span class="diff-del">-    cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate</span>
+<span class="diff-add">+    num_iterations: int = 1640 # number of iterations to run</span>
+<span class="diff-add">+    iteration_extension = 40 # number of iterations to continue training at final cooldown and window size</span>
+<span class="diff-add">+    cooldown_frac: int = 0.5 # fraction of training spent cooling down the learning rate</span>
+<span class="diff-ctx">     # evaluation and logging</span>
+<span class="diff-del">-    val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end</span>
+<span class="diff-del">-    save_checkpoint = False</span>
+<span class="diff-add">+    run_id: str = f&quot;{uuid.uuid4()}&quot;</span>
+<span class="diff-add">+    val_loss_every: int = 125 # every how many steps to evaluate val loss? 0 for only at the end</span>
+<span class="diff-add">+    save_checkpoint: bool = False</span>
+<span class="diff-add">+    # attention masking</span>
+<span class="diff-add">+    block_size: int = 128</span>
+<span class="diff-add">+    ws_schedule: tuple = (3, 7, 11)</span>
+<span class="diff-add">+    ws_validate: int = 13 # increase final validation ws, used for YaRN extension and short window size @classiclarryd</span>
+<span class="diff-add">+    ws_long_validate: int = 20 # extend long windows out even further</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> args = Hyperparameters()</span>
+<span class="diff-ctx"> </span>
+<span class="diff-add">+data_path = os.environ.get(&quot;DATA_PATH&quot;, &quot;.&quot;)</span>
+<span class="diff-add">+args.train_files = os.path.join(data_path, args.train_files)</span>
+<span class="diff-add">+args.val_files = os.path.join(data_path, args.val_files)</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> # torchrun sets these env variables</span>
+<span class="diff-ctx"> rank = int(os.environ[&quot;RANK&quot;])</span>
+<span class="diff-ctx"> world_size = int(os.environ[&quot;WORLD_SIZE&quot;])</span>
+<span class="diff-del">-assert world_size == 8 # this code is designed for 8xH100</span>
+<span class="diff-add">+assert 8 % world_size == 0, &quot;world_size must be a divisor of 8&quot;</span>
+<span class="diff-add">+grad_accum_steps = 8 // world_size</span>
+<span class="diff-ctx"> assert torch.cuda.is_available()</span>
+<span class="diff-ctx"> device = torch.device(&quot;cuda&quot;, int(os.environ[&quot;LOCAL_RANK&quot;]))</span>
+<span class="diff-ctx"> torch.cuda.set_device(device)</span>
+<span class="diff-hunk">@@ -582,7 +1176,7 @@ class Hyperparameters:</span>
+<span class="diff-ctx"> # begin logging</span>
+<span class="diff-ctx"> logfile = None</span>
+<span class="diff-ctx"> if master_process:</span>
+<span class="diff-del">-    run_id = uuid.uuid4()</span>
+<span class="diff-add">+    run_id = args.run_id</span>
+<span class="diff-ctx">     os.makedirs(&quot;logs&quot;, exist_ok=True)</span>
+<span class="diff-ctx">     logfile = f&quot;logs/{run_id}.txt&quot;</span>
+<span class="diff-ctx">     print(logfile)</span>
+<span class="diff-hunk">@@ -599,15 +1193,24 @@ def print0(s, console=False):</span>
+<span class="diff-ctx"> # log information about the hardware/software environment this is running on</span>
+<span class="diff-ctx"> print0(f&quot;Running Python {sys.version}&quot;)</span>
+<span class="diff-ctx"> print0(f&quot;Running PyTorch {torch.version.__version__} compiled for CUDA {torch.version.cuda}&quot;)</span>
+<span class="diff-add">+print0(f&quot;Running Triton version {triton.__version__}&quot;)</span>
+<span class="diff-add">+</span>
+<span class="diff-ctx"> def nvidia_smi():</span>
+<span class="diff-ctx">     import subprocess  # avoid top level import</span>
+<span class="diff-ctx">     return subprocess.run([&quot;nvidia-smi&quot;], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True).stdout</span>
+<span class="diff-ctx"> print0(nvidia_smi())</span>
+<span class="diff-ctx"> print0(&quot;=&quot;*100)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-model: nn.Module = GPT(vocab_size=50257, num_layers=12, num_heads=6, model_dim=768, max_seq_len=max(args.train_seq_len, args.val_seq_len)).cuda()</span>
+<span class="diff-add">+model: nn.Module = GPT(</span>
+<span class="diff-add">+    vocab_size=50257,</span>
+<span class="diff-add">+    num_layers=12,</span>
+<span class="diff-add">+    num_heads=6,</span>
+<span class="diff-add">+    head_dim=128,</span>
+<span class="diff-add">+    model_dim=768,</span>
+<span class="diff-add">+    max_seq_len=max(args.train_batch_size, args.val_batch_size) // (grad_accum_steps * world_size)</span>
+<span class="diff-add">+).cuda()</span>
+<span class="diff-ctx"> for m in model.modules():</span>
+<span class="diff-del">-    if isinstance(m, nn.Embedding):</span>
+<span class="diff-add">+    if isinstance(m, (nn.Embedding, nn.Linear)):</span>
+<span class="diff-ctx">         m.bfloat16()</span>
+<span class="diff-ctx"> for param in model.parameters():</span>
+<span class="diff-ctx">     dist.broadcast(param.detach(), 0)</span>
+<span class="diff-hunk">@@ -617,56 +1220,68 @@ def nvidia_smi():</span>
+<span class="diff-ctx"> embed_params = [p for n, p in model.named_parameters() if &quot;embed&quot; in n]</span>
+<span class="diff-ctx"> scalar_params = [p for p in model.parameters() if p.ndim &lt; 2]</span>
+<span class="diff-ctx"> head_params = [model.lm_head.weight]</span>
+<span class="diff-add">+smear_gate_params = [p for n, p in model.named_parameters() if &quot;smear&quot; in n]</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # init the optimizer(s)</span>
+<span class="diff-ctx"> # small adam epsilon by @YouJiacheng. this is an alternate method of fixing the world_size dependence</span>
+<span class="diff-ctx"> # discovered by @fernbear.bsky.social https://x.com/hi_tysam/status/1879692937589875094</span>
+<span class="diff-del">-optimizer1 = DistAdam(scalar_params + head_params + embed_params, lr=0.008, betas=(0.8, 0.95), eps=1e-10, weight_decay=0.0)</span>
+<span class="diff-del">-optimizer2 = Muon(hidden_matrix_params, lr=0.05, momentum=0.95, weight_decay=0.0)</span>
+<span class="diff-add">+optimizer1 = DistAdam(</span>
+<span class="diff-add">+    scalar_params + head_params + embed_params,</span>
+<span class="diff-add">+    lr=0.008,</span>
+<span class="diff-add">+    betas=(0.8, 0.95),</span>
+<span class="diff-add">+    eps=1e-8,</span>
+<span class="diff-add">+    weight_decay=0.0,</span>
+<span class="diff-add">+)</span>
+<span class="diff-add">+optimizer2 = Muon(hidden_matrix_params+smear_gate_params, lr=0.05, momentum=0.95, weight_decay=0.0)</span>
+<span class="diff-ctx"> optimizers = [optimizer1, optimizer2]</span>
+<span class="diff-ctx"> for opt in optimizers:</span>
+<span class="diff-ctx">     for group in opt.param_groups:</span>
+<span class="diff-ctx">         group[&quot;initial_lr&quot;] = group[&quot;lr&quot;]</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # learning rate schedule: stable then decay</span>
+<span class="diff-ctx"> def get_lr(step: int):</span>
+<span class="diff-del">-    x = step / args.num_iterations # progress in training</span>
+<span class="diff-add">+    x = min(0.9999,step / args.num_iterations)</span>
+<span class="diff-ctx">     assert 0 &lt;= x &lt; 1</span>
+<span class="diff-del">-    if x &lt; 1 - args.cooldown_frac:</span>
+<span class="diff-del">-        return 1.0</span>
+<span class="diff-del">-    else:</span>
+<span class="diff-add">+    lr = 1.0</span>
+<span class="diff-add">+    if x &gt;= 1 - args.cooldown_frac:</span>
+<span class="diff-ctx">         w = (1 - x) / args.cooldown_frac</span>
+<span class="diff-del">-        return w * 1.0 + (1 - w) * 0.1</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-# attention window size schedule: linearly increase</span>
+<span class="diff-del">-@lru_cache(1)</span>
+<span class="diff-del">-def get_window_size_blocks_helper(window_size: int):</span>
+<span class="diff-del">-    return torch.tensor(window_size // 128, dtype=torch.int32, pin_memory=True).cuda(non_blocking=True)</span>
+<span class="diff-del">-def get_window_size_blocks(step: int):</span>
+<span class="diff-del">-    x = step / args.num_iterations # progress in training</span>
+<span class="diff-del">-    assert 0 &lt;= x &lt;= 1</span>
+<span class="diff-del">-    # Linearly increase the block-wise sliding window size over training 128 -&gt; 1792</span>
+<span class="diff-del">-    # increase by @fernbear.bsky.social; block-wise by @YouJiacheng</span>
+<span class="diff-del">-    window_size = next_multiple_of_n(1728 * x, n=128)</span>
+<span class="diff-del">-    return get_window_size_blocks_helper(window_size)</span>
+<span class="diff-del">-</span>
+<span class="diff-del">-model: nn.Module = torch.compile(model, dynamic=False)</span>
+<span class="diff-add">+        lr = w * 1.0 + (1 - w) * 0.1</span>
+<span class="diff-add">+    return lr</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+def get_ws(step: int):</span>
+<span class="diff-add">+    if step == args.num_iterations+args.iteration_extension:</span>
+<span class="diff-add">+        return args.ws_validate//2, args.ws_validate</span>
+<span class="diff-add">+    x = min(step / (1 + args.num_iterations),0.9999)</span>
+<span class="diff-add">+    assert 0 &lt;= x &lt; 1</span>
+<span class="diff-add">+    ws_idx = int(len(args.ws_schedule) * x)</span>
+<span class="diff-add">+    return args.ws_schedule[ws_idx]//2, args.ws_schedule[ws_idx]</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+model: nn.Module = torch.compile(model, dynamic=False, fullgraph=True)</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> ########################################</span>
+<span class="diff-ctx"> #            Warmup kernels            #</span>
+<span class="diff-ctx"> ########################################</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> # Warmup the training kernels, then re-initialize the state so we aren&#x27;t cheating</span>
+<span class="diff-del">-warmup_steps = 10</span>
+<span class="diff-add">+warmup_steps = 30</span>
+<span class="diff-ctx"> initial_state = dict(model=copy.deepcopy(model.state_dict()),</span>
+<span class="diff-ctx">                      optimizers=[copy.deepcopy(opt.state_dict()) for opt in optimizers]) # save the initial state</span>
+<span class="diff-del">-train_loader = distributed_data_generator(args.train_files, world_size * args.train_seq_len, align_to_bos=True)</span>
+<span class="diff-del">-for _ in range(warmup_steps):</span>
+<span class="diff-del">-    inputs, targets = next(train_loader)</span>
+<span class="diff-del">-    model(inputs, targets, get_window_size_blocks(1)).backward()</span>
+<span class="diff-add">+train_loader = distributed_data_generator(args.train_files, args.train_batch_size, args.train_max_seq_len, grad_accum_steps=grad_accum_steps)</span>
+<span class="diff-add">+ws_long = args.ws_schedule[0]</span>
+<span class="diff-add">+for step in range(warmup_steps):</span>
+<span class="diff-add">+    inputs, targets, cum_seqlens = next(train_loader)</span>
+<span class="diff-add">+    new_ws_long = args.ws_schedule[step % len(args.ws_schedule)]  # each window size is a new graph, need to warm up each with YaRN params</span>
+<span class="diff-add">+    if new_ws_long &gt; ws_long:</span>
+<span class="diff-add">+        model.yarn.apply(ws_long, new_ws_long)</span>
+<span class="diff-add">+        ws_long = new_ws_long</span>
+<span class="diff-add">+    elif new_ws_long&lt;ws_long:</span>
+<span class="diff-add">+        model.yarn.reset()</span>
+<span class="diff-add">+        ws_long = new_ws_long</span>
+<span class="diff-add">+    model(inputs, targets, cum_seqlens, ws_long//2, ws_long).backward()</span>
+<span class="diff-ctx">     for opt in optimizers:</span>
+<span class="diff-ctx">         opt.step()</span>
+<span class="diff-ctx">     model.zero_grad(set_to_none=True)</span>
+<span class="diff-add">+model.yarn.reset()</span>
+<span class="diff-ctx"> model.load_state_dict(initial_state[&quot;model&quot;])</span>
+<span class="diff-ctx"> for opt, opt_state in zip(optimizers, initial_state[&quot;optimizers&quot;]):</span>
+<span class="diff-ctx">     opt.load_state_dict(opt_state)</span>
+<span class="diff-hunk">@@ -676,31 +1291,37 @@ def get_window_size_blocks(step: int):</span>
+<span class="diff-ctx"> #        Training and validation       #</span>
+<span class="diff-ctx"> ########################################</span>
+<span class="diff-ctx"> </span>
+<span class="diff-del">-train_loader = distributed_data_generator(args.train_files, world_size * args.train_seq_len, align_to_bos=True)</span>
+<span class="diff-add">+train_loader = distributed_data_generator(args.train_files, args.train_batch_size, args.train_max_seq_len, grad_accum_steps=grad_accum_steps)</span>
+<span class="diff-ctx"> training_time_ms = 0</span>
+<span class="diff-ctx"> # start the clock</span>
+<span class="diff-ctx"> torch.cuda.synchronize()</span>
+<span class="diff-ctx"> t0 = time.perf_counter()</span>
+<span class="diff-ctx"> # begin training</span>
+<span class="diff-del">-train_steps = args.num_iterations</span>
+<span class="diff-add">+train_steps = args.num_iterations + args.iteration_extension</span>
+<span class="diff-add">+ws_short, ws_long = get_ws(0)</span>
+<span class="diff-ctx"> for step in range(train_steps + 1):</span>
+<span class="diff-ctx">     last_step = (step == train_steps)</span>
+<span class="diff-add">+    ws_short, new_ws_long = get_ws(step)</span>
+<span class="diff-add">+    if new_ws_long != ws_long:</span>
+<span class="diff-add">+        model.yarn.apply(ws_long, new_ws_long)</span>
+<span class="diff-add">+        ws_long=new_ws_long</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     # --------------- VALIDATION SECTION -----------------</span>
+<span class="diff-ctx">     if last_step or (args.val_loss_every &gt; 0 and step % args.val_loss_every == 0):</span>
+<span class="diff-add">+        if last_step:</span>
+<span class="diff-add">+            ws_long = args.ws_long_validate</span>
+<span class="diff-ctx">         # stop the clock</span>
+<span class="diff-ctx">         torch.cuda.synchronize()</span>
+<span class="diff-ctx">         training_time_ms += 1000 * (time.perf_counter() - t0)</span>
+<span class="diff-ctx">         model.eval()</span>
+<span class="diff-del">-        val_batch_size = world_size * args.val_seq_len</span>
+<span class="diff-del">-        assert args.val_tokens % val_batch_size == 0</span>
+<span class="diff-del">-        val_steps = args.val_tokens // val_batch_size</span>
+<span class="diff-del">-        val_loader = distributed_data_generator(args.val_files, val_batch_size, align_to_bos=False)</span>
+<span class="diff-add">+        assert args.val_tokens % args.val_batch_size == 0</span>
+<span class="diff-add">+        val_steps = grad_accum_steps * args.val_tokens // args.val_batch_size</span>
+<span class="diff-add">+        val_loader = distributed_data_generator(args.val_files, args.val_batch_size, -1, grad_accum_steps=grad_accum_steps, align_to_bos=False)</span>
+<span class="diff-ctx">         val_loss = 0</span>
+<span class="diff-ctx">         with torch.no_grad():</span>
+<span class="diff-ctx">             for _ in range(val_steps):</span>
+<span class="diff-del">-                inputs, targets = next(val_loader)</span>
+<span class="diff-del">-                val_loss += model(inputs, targets, get_window_size_blocks(step))</span>
+<span class="diff-add">+                inputs, targets, cum_seqlens = next(val_loader)</span>
+<span class="diff-add">+                val_loss += model(inputs, targets, cum_seqlens, ws_short, ws_long)</span>
+<span class="diff-ctx">         val_loss /= val_steps</span>
+<span class="diff-ctx">         del val_loader</span>
+<span class="diff-ctx">         dist.all_reduce(val_loss, op=dist.ReduceOp.AVG)</span>
+<span class="diff-hunk">@@ -719,8 +1340,9 @@ def get_window_size_blocks(step: int):</span>
+<span class="diff-ctx">         break</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx">     # --------------- TRAINING SECTION -----------------</span>
+<span class="diff-del">-    inputs, targets = next(train_loader)</span>
+<span class="diff-del">-    model(inputs, targets, get_window_size_blocks(step)).backward()</span>
+<span class="diff-add">+    for _ in range(grad_accum_steps):</span>
+<span class="diff-add">+        inputs, targets, cum_seqlens = next(train_loader)</span>
+<span class="diff-add">+        model(inputs, targets, cum_seqlens, ws_short, ws_long).backward()</span>
+<span class="diff-ctx">     # set optimization hyperparameters</span>
+<span class="diff-ctx">     for opt in optimizers:</span>
+<span class="diff-ctx">         for group in opt.param_groups:</span>
+<span class="diff-hunk">@@ -739,4 +1361,4 @@ def get_window_size_blocks(step: int):</span>
+<span class="diff-ctx"> </span>
+<span class="diff-ctx"> print0(f&quot;peak memory allocated: {torch.cuda.max_memory_allocated() // 1024 // 1024} MiB &quot;</span>
+<span class="diff-ctx">        f&quot;reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB&quot;, console=True)</span>
+<span class="diff-del">-dist.destroy_process_group()</span>
+<span class="diff-ctx">\ No newline at end of file</span>
+<span class="diff-add">+dist.destroy_process_group()</span></div>
+                </div></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Record/Log Files Added (PR #131)</span>
+                    <span>99 file(s)</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body"><ul><li style="color:var(--muted);font-size:0.85rem">records/071825_TritonMuon/record.txt <span class="add" style="color:var(--green)">+2848</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/020630eb-2191-4ba2-9ee4-4cdc94316943.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/21e732fb-4c4b-4db9-94bc-9fcd5d59b080.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/4518e917-cec2-4c81-9c1a-53b0644c2326.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/48b19604-5049-48c9-956c-8ddc4d0781fb.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/50524dcb-cf95-4b75-bf89-ba8ff3c5e1af.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/53ecb4ef-77ed-4af6-b776-47cd4006614b.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/6701af06-6c40-4553-bb04-f501fdd56284.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/6df384bb-9c24-46b3-826b-f7c07168c27a.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/README.md <span class="add" style="color:var(--green)">+45</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/a39b1ae8-3a2a-4952-8032-13183b157053.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/c6be54c1-12d0-45a3-83cb-41cad0868d15.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/ca042caf-b232-4a25-b28f-88e39a2009d3.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/d3e1ea3c-521c-4abd-a549-950c698d6cbf.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/e8891a98-8bf2-43cc-bac5-728aa53482ce.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/082325_SparseAttnGate/eb6d347b-fd4a-4077-a490-436c64f97ce2.txt <span class="add" style="color:var(--green)">+2802</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/44fc1276-0510-4961-92c0-730c65e5feba.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/4c2f3422-1b2e-4b62-be78-f09cac5730b8.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/65b0d9c0-3089-40eb-a1bc-45b15f897462.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/831dade9-9b29-43ff-9106-80fc680b3e57.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/README.md <span class="add" style="color:var(--green)">+133</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/ce3400f2-2ca1-4e0e-a784-089451df1913.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/d5d05889-69c7-4887-ac9b-baaae1a5f499.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/f4f7b0aa-07a1-49a2-903f-97cd5277e73c.txt <span class="add" style="color:var(--green)">+2814</span></li><li style="color:var(--muted);font-size:0.85rem">records/090325_FA3/media/attn_speed_vs_batch_s1024_ws384.png <span class="add" style="color:var(--green)">+0</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/07e7ae76-b7d0-4481-b149-01e7d81b5ad4.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/1858912a-2697-4461-9edb-e5ee4246ee3d.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/3a3f4c61-475d-4fcb-a606-65aa3784d7af.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/56955462-7201-4627-91d9-b2426a1424e2.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/5ab34e6e-f1db-4ceb-a639-9186a26a48f5.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/70af20aa-f602-4cc1-85e9-430a1664f62e.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/8ac310eb-aa6a-4f5b-b298-8a0cbcb01398.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/cf25c17a-ae33-4c45-8478-3e4f177a9f26.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/cf8c8a10-ea32-46a0-8276-241330023e83.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_0f6c8eac-db39-49ce-bef8-08a34044625f.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_1b9374fc-2a63-47a1-b144-2fc8ad635792.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_3f42c181-6303-4ade-9f64-556d44d54065.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_50e5b966-21a9-4545-8c88-91308e140958.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_803c2d15-4adb-42d2-958b-0b712cd9d062.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_9a9ac5ac-514a-43e0-ab92-1319bf013a3b.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_adcc39f4-c919-420a-bd94-9d0035f0038c.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_c753588f-47c7-4107-9087-3c5da90cc0f4.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_d3bc9a09-09e9-450c-a8d7-f53a4f5aed01.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/comparison_e501e1e9-39fa-473b-bded-39427f349f37.txt <span class="add" style="color:var(--green)">+2815</span></li><li style="color:var(--muted);font-size:0.85rem">records/090525_SkipMLPBlocks/f01447c9-da70-405a-8ed0-858caadd1194.txt <span class="add" style="color:var(--green)">+2853</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/0ecdb695-510b-4c3b-b030-09861a162ce8.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/132fe599-bc5a-4237-ad14-ee33cbbd5fc0.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/61b04c65-2c0f-4d24-83e2-6035dfea1582.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/6297777d-03bd-4955-9c3a-c854246b928a.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/783d22ec-c441-4d93-9fd7-cd00d2c473e8.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/9121a353-d3ce-4f54-98de-0b466773fe0b.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/ReadMe.md <span class="add" style="color:var(--green)">+98</span></li><li style="color:var(--muted);font-size:0.85rem">records/091025_Yarn/ef66c943-e262-400f-822f-068d397a1dc9.txt <span class="add" style="color:var(--green)">+2863</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/0d0d9882-c34f-4d82-b961-a17d5659c988.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/0d451b7e-6500-41ae-ac9d-02352e611b88.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/19171a35-3730-4239-b15e-3728d8de73db.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/3b564c86-3d85-490d-a96a-83bd60d60f11.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/648dffae-9eb3-4d2a-a28a-dae8d1152aa7.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/6ecf5ea5-e999-4da1-a501-4fbc7160aec5.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/7129a36e-505d-456b-aed5-ea8e455a0bac.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/README.md <span class="add" style="color:var(--green)">+53</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/a077c741-ce5d-4639-955b-d7a2660b5cf8.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/a72c99e9-0019-4baa-a858-f8738392933f.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/ab5b991b-3767-4092-851a-5c266ae5c1e2.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/b4bb35d4-92c1-42f4-91dd-dfbf665e66b4.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091125_VectSigmoidBFloat16/deb22a2c-6cf2-46f9-a350-aec1c97e9909.txt <span class="add" style="color:var(--green)">+3382</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/25db37c7-2bab-4ef4-ae63-d593590ef823.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/26acd99c-9089-406e-8249-f0532e6c2a13.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/305f24ee-051f-41a0-939a-0fa26654712a.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/517e4b6c-2cc5-46ae-82fe-55c86f28ac0e.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/584d668b-cc79-4dde-b5be-b911623bdb61.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/61705980-e239-4d86-9233-210200da7010.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/720dfef5-25c6-4e17-81b5-975ecfdd4d81.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/93252460-2bb6-4e87-bdf0-1d2ca99f48df.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/93480ae1-43e4-415b-813e-ba8b43ab899b.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/README.md <span class="add" style="color:var(--green)">+29</span></li><li style="color:var(--muted);font-size:0.85rem">records/091525_AsyncDataLoadAttnFinalWindow/a04db288-4cdd-4401-bdd1-444b26c53cd8.txt <span class="add" style="color:var(--green)">+3111</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/18a1e5c7-947e-479d-bc3a-a57a61a98fc9.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/1cc585a6-ecd2-452c-905d-d5774079e6ff.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/2bbcf732-7a1d-4bad-b992-aa018419033e.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/36761e6e-19ee-414f-a43c-63729950dfe7.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/4e8d8366-3db6-43fc-aba0-03be7d484dd3.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/692ba682-7466-4b59-a31a-7e0adcb55b4b.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/81535293-56a7-49f3-925c-569441d4f87c.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/898a21a4-3cf7-4c32-a61b-c3427618ae7b.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/README.md <span class="add" style="color:var(--green)">+35</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/cc16404d-92d4-48c1-b9b0-b906360363b4.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/091825_Smear/fd1a1ca9-afff-4881-a686-8b56bad5901b.txt <span class="add" style="color:var(--green)">+3089</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/01fc4a96-f2a0-47a1-8a6a-c7d10bac99fe.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/06350b97-4a98-47da-90c1-3b957af8af6c.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/278c1540-3b42-4ab0-94ed-273830bdfa11.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/79383017-eb05-4857-842a-7866b00571b4.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/README.md <span class="add" style="color:var(--green)">+44</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/a7f9849e-8c31-4e1a-9149-ab466d7c80b6.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/ab8c620e-3d52-42eb-b46e-d69b608b22bc.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/bc936c5a-1d9f-4405-8648-de50e4d5aca6.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/be55679c-393d-432f-882d-287e7cfa727d.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/d511e5c8-cce8-43ff-bac2-5168366ba47c.txt <span class="add" style="color:var(--green)">+3138</span></li><li style="color:var(--muted);font-size:0.85rem">records/092125_DropAttn/e5a48f93-373e-4ff2-903b-5303bf912330.txt <span class="add" style="color:var(--green)">+3138</span></li></ul></div>
+                </div>
+            </div>
+    
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <span><span class="toggle-icon open">▶</span> Training Metrics (1 runs)</span>
+            </div>
+            <div class="collapsible-content open">
+                <div class="section-body">
+                    <table class="metrics-table">
+                        <tr><th>Log File</th><th>Val Loss</th><th>Train Time</th><th>Steps</th><th>Step Avg</th><th>Peak Memory</th></tr>
+                        <tr>
+                <td>01fc4a96-f2a0-47a1-8a6a-c7d10bac99fe.txt <span style="color:var(--green)">[has code]</span></td>
+                <td>3.2798</td>
+                <td>151.5s</td>
+                <td>1680</td>
+                <td>90.19ms</td>
+                <td>31255 MiB</td>
+            </tr>
+                    </table>
+                    
+                </div>
+            </div>
+        </div>
+    
+            <div class="section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span><span class="toggle-icon">▶</span> Full Code Snapshot: 01fc4a96-f2a0-47a1-8a6a-c7d10bac99fe.txt</span>
+                    <span>1277 lines</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="section-body">
+                        <p class="muted" style="padding:0.5rem 1rem">Showing first 500 of 1277 lines</p>
+                        <div class="code-viewer"><pre><span class="line">import os</span><span class="line">import sys</span><span class="line"></span><span class="line">with open(sys.argv[0]) as f:</span><span class="line">    code = f.read()  # read the code of this file ASAP, for logging</span><span class="line">import copy</span><span class="line">import glob</span><span class="line">import math</span><span class="line">import threading</span><span class="line">import time</span><span class="line">import uuid</span><span class="line">from dataclasses import dataclass</span><span class="line">from itertools import accumulate</span><span class="line">from pathlib import Path</span><span class="line"></span><span class="line">os.environ[&quot;PYTORCH_CUDA_ALLOC_CONF&quot;] = &quot;expandable_segments:True&quot;</span><span class="line">import torch</span><span class="line"></span><span class="line">torch.empty(</span><span class="line">    1, device=&quot;cuda&quot;, requires_grad=True</span><span class="line">).backward()  # prevents a bug on some systems</span><span class="line">import torch._dynamo as dynamo</span><span class="line">import torch.distributed as dist</span><span class="line">import torch.nn.functional as F</span><span class="line"></span><span class="line"># torch._inductor.config.coordinate_descent_tuning = True # we have banned this flag for new records because it causes compilation to take 30min</span><span class="line">import triton</span><span class="line">import triton.language as tl</span><span class="line">from flash_attn_interface import flash_attn_varlen_func</span><span class="line">from torch import Tensor, nn</span><span class="line"></span><span class="line">dynamo.config.recompile_limit = 64</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Custom operators: FP8 matmul by @YouJiacheng</span><span class="line"></span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm&quot;, mutates_args=())</span><span class="line">def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(x: Tensor, w: Tensor):</span><span class="line">        assert x.is_contiguous() and w.is_contiguous()</span><span class="line">        x_f8 = x.div(x_s).to(torch.float8_e4m3fn)</span><span class="line">        w_f8 = w.div(w_s).to(torch.float8_e4m3fn)</span><span class="line">        out = torch._scaled_mm(</span><span class="line">            x_f8,</span><span class="line">            w_f8.T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=x.new_tensor(x_s, dtype=torch.float32),</span><span class="line">            scale_b=x.new_tensor(w_s, dtype=torch.float32),</span><span class="line">            use_fast_accum=True,</span><span class="line">        )</span><span class="line">        return out, x_f8, w_f8</span><span class="line"></span><span class="line">    return impl(x, w)</span><span class="line"></span><span class="line">@mm_op.register_fake</span><span class="line">def _(x: Tensor, w: Tensor, *_):</span><span class="line">    assert x.ndim == w.ndim == 2</span><span class="line">    assert x.shape[1] == w.shape[1]</span><span class="line">    assert x.device == w.device</span><span class="line">    assert x.is_contiguous() and w.is_contiguous()</span><span class="line">    return x @ w.T, x.to(torch.float8_e4m3fn), w.to(torch.float8_e4m3fn)</span><span class="line"></span><span class="line">@torch.library.custom_op(&quot;nanogpt::mm_backward&quot;, mutates_args=())</span><span class="line">def mm_backward_op(g: Tensor, x_f8: Tensor, w_f8: Tensor, x_s: float, w_s: float, grad_s: float) -&gt; tuple[Tensor, Tensor]:</span><span class="line">    @torch.compile</span><span class="line">    def impl(grad: Tensor, x_f8: Tensor, w_f8: Tensor):</span><span class="line">        assert grad.is_contiguous()</span><span class="line">        x_inv_s = grad.new_tensor(x_s, dtype=torch.float32)</span><span class="line">        w_inv_s = grad.new_tensor(w_s, dtype=torch.float32)</span><span class="line">        grad_inv_s = grad.new_tensor(grad_s, dtype=torch.float32)</span><span class="line">        grad_f8 = grad.div(grad_s).to(torch.float8_e5m2)</span><span class="line">        grad_x = torch._scaled_mm(</span><span class="line">            grad_f8,</span><span class="line">            w_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.bfloat16,</span><span class="line">            scale_a=grad_inv_s,</span><span class="line">            scale_b=w_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        )</span><span class="line">        # faster than grad_f8_t @ x_f8, for (d_out, d_in) == (50304, 768)</span><span class="line">        grad_w = torch._scaled_mm(</span><span class="line">            x_f8.T.contiguous(),</span><span class="line">            grad_f8.T.contiguous().T,</span><span class="line">            out_dtype=torch.float32,</span><span class="line">            scale_a=x_inv_s,</span><span class="line">            scale_b=grad_inv_s,</span><span class="line">            use_fast_accum=False,</span><span class="line">        ).T</span><span class="line">        return grad_x, grad_w</span><span class="line"></span><span class="line">    return impl(g, x_f8, w_f8)</span><span class="line"></span><span class="line">@mm_backward_op.register_fake</span><span class="line">def _(g: Tensor, x_f8: Tensor, w_f8: Tensor, *_):</span><span class="line">    return x_f8.to(torch.bfloat16), w_f8.T.contiguous().T.to(torch.float32)</span><span class="line"></span><span class="line">def backward(ctx, grad_out: Tensor, *_):</span><span class="line">    x_f8, w_f8 = ctx.saved_tensors</span><span class="line">    x_s, w_s, grad_s = ctx.scales</span><span class="line">    grad_x, grad_w = torch.ops.nanogpt.mm_backward(</span><span class="line">        grad_out, x_f8, w_f8, x_s, w_s, grad_s</span><span class="line">    )</span><span class="line">    return grad_x, grad_w, None, None, None</span><span class="line"></span><span class="line">def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):</span><span class="line">    *_, x_s, w_s, grad_s = inputs</span><span class="line">    _, x_f8, w_f8 = output</span><span class="line">    ctx.save_for_backward(x_f8, w_f8)</span><span class="line">    ctx.scales = x_s, w_s, grad_s</span><span class="line">    ctx.set_materialize_grads(False)</span><span class="line"></span><span class="line">mm_op.register_autograd(backward, setup_context=setup_context)</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Triton kernel for symmetric matrix multiplication by @byronxu99</span><span class="line"></span><span class="line">def _get_autotune_configs():</span><span class="line">    return [</span><span class="line">        triton.Config(</span><span class="line">            {</span><span class="line">                &quot;BLOCK_SIZE_M&quot;: bm,</span><span class="line">                &quot;BLOCK_SIZE_N&quot;: bn,</span><span class="line">                &quot;BLOCK_SIZE_K&quot;: bk,</span><span class="line">                &quot;GROUP_SIZE_M&quot;: 8,</span><span class="line">                &quot;LOWER_UPPER&quot;: 1,</span><span class="line">            },</span><span class="line">            num_stages=stages,</span><span class="line">            num_warps=warps,</span><span class="line">        )</span><span class="line">        for bm in [64, 128]</span><span class="line">        for bn in [64, 128, 256]</span><span class="line">        for bk in [64, 128]</span><span class="line">        for stages, warps in [(3, 4), (3, 8), (4, 4)]</span><span class="line">        if bm // bn &lt;= 2 and bn // bm &lt;= 2</span><span class="line">    ]</span><span class="line"></span><span class="line">@triton.jit</span><span class="line">def _pid_to_block(</span><span class="line">    pid,</span><span class="line">    M,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">):</span><span class="line">    # Split output matrix into blocks of size (BLOCK_SIZE_M, BLOCK_SIZE_N)</span><span class="line">    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)</span><span class="line">    num_pid_n = tl.cdiv(M, BLOCK_SIZE_N)</span><span class="line"></span><span class="line">    # Map PID to a single matrix in batch</span><span class="line">    batch_idx = pid // (num_pid_m * num_pid_n)</span><span class="line">    pid = pid % (num_pid_m * num_pid_n)</span><span class="line"></span><span class="line">    # Map PID to 2D grid of blocks</span><span class="line">    pid_m = pid // num_pid_n</span><span class="line">    pid_n = pid % num_pid_n</span><span class="line">    pid_m, pid_n = tl.swizzle2d(pid_m, pid_n, num_pid_m, num_pid_n, GROUP_SIZE_M)</span><span class="line"></span><span class="line">    m_idx = pid_m * BLOCK_SIZE_M</span><span class="line">    n_idx = pid_n * BLOCK_SIZE_N</span><span class="line">    return batch_idx, m_idx, n_idx</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;K&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ns_line_1_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M, K,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(K, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; K - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ns_line_1(A: torch.Tensor, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = A @ A.T</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert out.size(-2) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line">    assert out.size(-1) == M, &quot;Output matrix has incorrect shape&quot;</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ns_line_1_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        K=K,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@triton.autotune(</span><span class="line">    configs=_get_autotune_configs(),</span><span class="line">    key=[&quot;M&quot;, &quot;a_stride_r&quot;, &quot;a_stride_c&quot;, &quot;c_stride_r&quot;, &quot;c_stride_c&quot;],</span><span class="line">)</span><span class="line">@triton.jit</span><span class="line">def ns_line_2_kernel(</span><span class="line">    A_ptr, C_ptr,</span><span class="line">    M,</span><span class="line">    a_stride_b, a_stride_r, a_stride_c,</span><span class="line">    c_stride_b, c_stride_r, c_stride_c,</span><span class="line">    alpha, beta,</span><span class="line">    BLOCK_SIZE_M: tl.constexpr,</span><span class="line">    BLOCK_SIZE_N: tl.constexpr,</span><span class="line">    BLOCK_SIZE_K: tl.constexpr,</span><span class="line">    GROUP_SIZE_M: tl.constexpr,</span><span class="line">    LOWER_UPPER: tl.constexpr,</span><span class="line">):</span><span class="line">    # This is mostly duplicated from ns_line_1_kernel, but also loads and adds a block of A</span><span class="line">    # Performance is slightly slower than ns_line_1_kernel, so we use two separate kernels</span><span class="line">    pid = tl.program_id(axis=0)</span><span class="line">    batch_idx, m_idx, n_idx = _pid_to_block(</span><span class="line">        pid, M, BLOCK_SIZE_M, BLOCK_SIZE_N, GROUP_SIZE_M</span><span class="line">    )</span><span class="line"></span><span class="line">    # Skip blocks that don&#x27;t need to be computed</span><span class="line">    skip_block_below_diag = (LOWER_UPPER == 0) and (n_idx + BLOCK_SIZE_N &lt;= m_idx)</span><span class="line">    skip_block_above_diag = (LOWER_UPPER != 0) and (m_idx + BLOCK_SIZE_M &lt;= n_idx)</span><span class="line">    if skip_block_below_diag or skip_block_above_diag:</span><span class="line">        return</span><span class="line"></span><span class="line">    # Index into one matrix of batch</span><span class="line">    A_ptr += batch_idx * a_stride_b</span><span class="line">    C_ptr += batch_idx * c_stride_b</span><span class="line"></span><span class="line">    # Create pointer arrays for A and A.T</span><span class="line">    offs_m = (m_idx + tl.arange(0, BLOCK_SIZE_M)) % M</span><span class="line">    offs_n = (n_idx + tl.arange(0, BLOCK_SIZE_N)) % M</span><span class="line">    offs_k = tl.arange(0, BLOCK_SIZE_K)</span><span class="line">    a_ptrs = A_ptr + (offs_m[:, None] * a_stride_r + offs_k[None, :] * a_stride_c)</span><span class="line">    at_ptrs = A_ptr + (offs_k[:, None] * a_stride_c + offs_n[None, :] * a_stride_r)</span><span class="line"></span><span class="line">    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)</span><span class="line"></span><span class="line">    # Accumulate over blocks of K</span><span class="line">    for k in tl.range(0, tl.cdiv(M, BLOCK_SIZE_K)):</span><span class="line">        a = tl.load(a_ptrs, mask=offs_k[None, :] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        at = tl.load(at_ptrs, mask=offs_k[:, None] &lt; M - k * BLOCK_SIZE_K, other=0.0)</span><span class="line">        accumulator = tl.dot(a, at, accumulator)</span><span class="line">        a_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line">        at_ptrs += BLOCK_SIZE_K * a_stride_c</span><span class="line"></span><span class="line">    # Load block of A to add (corresponds to the current block of C)</span><span class="line">    offs_am = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_an = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    a_add_ptrs = A_ptr + (offs_am[:, None] * a_stride_r + offs_an[None, :] * a_stride_c)</span><span class="line">    a_add_mask = (offs_am[:, None] &lt; M) &amp; (offs_an[None, :] &lt; M)</span><span class="line">    a_add = tl.load(a_add_ptrs, mask=a_add_mask, other=0.0).to(tl.float32)</span><span class="line"></span><span class="line">    # Apply alpha and beta</span><span class="line">    accumulator *= alpha</span><span class="line">    accumulator += a_add * beta</span><span class="line"></span><span class="line">    out_dtype = C_ptr.dtype.element_ty</span><span class="line">    output = accumulator.to(out_dtype)</span><span class="line"></span><span class="line">    # Store block of C</span><span class="line">    offs_cm = m_idx + tl.arange(0, BLOCK_SIZE_M)</span><span class="line">    offs_cn = n_idx + tl.arange(0, BLOCK_SIZE_N)</span><span class="line">    c_ptrs = C_ptr + (offs_cm[:, None] * c_stride_r + offs_cn[None, :] * c_stride_c)</span><span class="line">    c_mask = (offs_cm[:, None] &lt; M) &amp; (offs_cn[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs, output, mask=c_mask)</span><span class="line"></span><span class="line">    # Store block of C mirrored across the diagonal</span><span class="line">    c_ptrs_t = C_ptr + (offs_cn[:, None] * c_stride_r + offs_cm[None, :] * c_stride_c)</span><span class="line">    c_mask_t = (offs_cn[:, None] &lt; M) &amp; (offs_cm[None, :] &lt; M)</span><span class="line">    tl.store(c_ptrs_t, output.T, mask=c_mask_t)</span><span class="line"></span><span class="line">def ns_line_2(A: torch.Tensor, alpha: float, beta: float, out: torch.Tensor):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Launch Triton kernel to compute C = alpha * A @ A.T + beta * A</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    assert A.ndim == 2 or A.ndim == 3</span><span class="line">    M, K = A.shape[-2:]</span><span class="line">    assert M == K, &quot;Input matrix must be square&quot;</span><span class="line">    assert out.size(-2) == M</span><span class="line">    assert out.size(-1) == M</span><span class="line"></span><span class="line">    batch_size = A.size(0) if A.ndim == 3 else 1</span><span class="line">    input_batch_stride = A.stride(0) if A.ndim == 3 else 0</span><span class="line">    output_batch_stride = out.stride(0) if out.ndim == 3 else 0</span><span class="line"></span><span class="line">    grid = lambda meta: (</span><span class="line">        batch_size * triton.cdiv(M, meta[&quot;BLOCK_SIZE_M&quot;]) * triton.cdiv(M, meta[&quot;BLOCK_SIZE_N&quot;]),</span><span class="line">    )</span><span class="line">    ns_line_2_kernel[grid](</span><span class="line">        A_ptr=A,</span><span class="line">        C_ptr=out,</span><span class="line">        M=M,</span><span class="line">        a_stride_b=input_batch_stride,</span><span class="line">        a_stride_r=A.stride(-2),</span><span class="line">        a_stride_c=A.stride(-1),</span><span class="line">        c_stride_b=output_batch_stride,</span><span class="line">        c_stride_r=out.stride(-2),</span><span class="line">        c_stride_c=out.stride(-1),</span><span class="line">        alpha=alpha,</span><span class="line">        beta=beta,</span><span class="line">    )</span><span class="line">    return out</span><span class="line"></span><span class="line">@torch.compile(dynamic=False, fullgraph=True) # Must use dynamic=False or else it&#x27;s much slower</span><span class="line">def newton_schulz_triton(G: torch.Tensor):</span><span class="line">    a, b, c = (3.4445, -4.7750, 2.0315)</span><span class="line">    X = G.bfloat16()</span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line"></span><span class="line">    # Ensure spectral norm is at most 1</span><span class="line">    X = X / (X.norm(dim=(-2, -1), keepdim=True) + 1e-7)</span><span class="line"></span><span class="line">    # Allocate buffers</span><span class="line">    X = X.contiguous()</span><span class="line">    A = torch.empty((*X.shape[:-1], X.size(-2)), device=X.device, dtype=X.dtype)</span><span class="line">    B = torch.empty_like(A)</span><span class="line">    C = torch.empty_like(X)</span><span class="line"></span><span class="line">    ns_line_3 = torch.baddbmm if X.ndim &gt; 2 else torch.addmm</span><span class="line"></span><span class="line">    # Perform the NS iterations</span><span class="line">    for _ in range(5):</span><span class="line">        ns_line_1(X, out=A)  # A = X @ X.mT</span><span class="line">        ns_line_2(A, alpha=c, beta=b, out=B)  # B = b * A + c * A @ A</span><span class="line">        ns_line_3(X, B, X, beta=a, out=C)  # C = a * X + B @ X</span><span class="line">        X, C = C, X  # Swap references to avoid unnecessary copies</span><span class="line"></span><span class="line">    if G.size(-2) &gt; G.size(-1):</span><span class="line">        X = X.mT</span><span class="line">    return X</span><span class="line"></span><span class="line"># -----------------------------------------------------------------------------</span><span class="line"># Muon optimizer</span><span class="line"></span><span class="line">class Muon(torch.optim.Optimizer):</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    Muon - MomentUm Orthogonalized by Newton-schulz</span><span class="line"></span><span class="line">    https://kellerjordan.github.io/posts/muon/</span><span class="line"></span><span class="line">    Muon internally runs standard SGD-momentum, and then performs an orthogonalization post-</span><span class="line">    processing step, in which each 2D parameter&#x27;s update is replaced with the nearest orthogonal</span><span class="line">    matrix. To efficiently orthogonalize each update, we use a Newton-Schulz iteration, which has</span><span class="line">    the advantage that it can be stably run in bfloat16 on the GPU.</span><span class="line"></span><span class="line">    Warning: This optimizer should not be used for the embedding layer, the final fully connected layer,</span><span class="line">    or any {0,1}-D parameters; those should all be optimized by a standard method (e.g., AdamW).</span><span class="line">    &quot;&quot;&quot;</span><span class="line">    def __init__(self, params, lr=0.02, weight_decay=0.01, momentum=0.95):</span><span class="line">        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum)</span><span class="line">        params = list(params)</span><span class="line">        sizes = {p.shape for p in params}</span><span class="line">        # create one buffer per unique parameter-size</span><span class="line">        param_groups = []</span><span class="line">        for size in sizes:</span><span class="line">            group_params = [p for p in params if p.shape == size]</span><span class="line">            param_groups.append(dict(params=group_params))</span><span class="line">        super().__init__(param_groups, defaults)</span><span class="line"></span><span class="line">    @torch.no_grad()</span><span class="line">    def step(self):</span><span class="line">        # Efficient systems-wise implementation of step developed by @YouJiacheng,</span><span class="line">        # @KonstantinWilleke, @alexrgilbert, @adricarda, @tuttyfrutyee, @vdlad,</span><span class="line">        # @ryanyang0, and @vagrawal.</span><span class="line">        rank = dist.get_rank()</span><span class="line">        world_size = dist.get_world_size()</span><span class="line">        group_infos = []</span><span class="line">        for group in self.param_groups:</span><span class="line">            params: list[Tensor] = group[&quot;params&quot;]</span><span class="line">            if not params:</span><span class="line">                continue</span><span class="line"></span><span class="line">            num_params = len(params)</span><span class="line">            padded_num_params = (</span><span class="line">                (num_params + world_size - 1) // world_size * world_size</span><span class="line">            )</span><span class="line"></span><span class="line">            grads_to_stack = [p.grad for p in params]</span><span class="line">            if padded_num_params &gt; num_params:</span><span class="line">                padding_grad = torch.zeros_like(params[0].grad)</span><span class="line">                grads_to_stack.extend(</span><span class="line">                    [padding_grad] * (padded_num_params - num_params)</span><span class="line">                )</span><span class="line"></span><span class="line">            stacked_grads = torch.stack(grads_to_stack)</span><span class="line"></span><span class="line">            chunk_size = padded_num_params // world_size</span><span class="line">            grad_chunk = torch.empty(</span><span class="line">                (chunk_size, *params[0].grad.shape),</span><span class="line">                dtype=stacked_grads.dtype,</span><span class="line">                device=stacked_grads.device,</span><span class="line">            )</span><span class="line"></span><span class="line">            reduce_future = dist.reduce_scatter_tensor(</span><span class="line">                grad_chunk, stacked_grads, op=dist.ReduceOp.AVG, async_op=True</span><span class="line">            ).get_future()</span><span class="line"></span><span class="line">            group_infos.append(</span><span class="line">                {</span><span class="line">                    &quot;params&quot;: params,</span><span class="line">                    &quot;grad_chunk&quot;: grad_chunk,</span><span class="line">                    &quot;reduce_future&quot;: reduce_future,</span><span class="line">                    &quot;chunk_size&quot;: chunk_size,</span><span class="line">                    &quot;padded_num_params&quot;: padded_num_params,</span><span class="line">                }</span><span class="line">            )</span><span class="line"></span><span class="line">        all_gather_infos = []</span><span class="line">        # Second pass: wait for gradients, compute updates for the local shard of parameters,</span><span class="line">        # and launch all async all_gather operations.</span><span class="line">        for group, info in zip(self.param_groups, group_infos):</span><span class="line">            info[&quot;reduce_future&quot;].wait()</span><span class="line"></span><span class="line">            params = info[&quot;params&quot;]</span><span class="line">            grad_chunk = info[&quot;grad_chunk&quot;]</span><span class="line">            chunk_size = info[&quot;chunk_size&quot;]</span><span class="line">            start_idx = rank * chunk_size</span><span class="line"></span><span class="line">            # Determine effective LR and WD once per group, assuming constant for same-shaped params.</span><span class="line">            # This helps in vectorizing operations later.</span><span class="line">            p_example = params[0]  # All params in a group have the same shape.</span><span class="line">            eff_lr_val = (</span><span class="line">                group[&quot;lr&quot;]</span><span class="line">                * max(1, p_example.size(-2) / p_example.size(-1)) ** 0.5</span><span class="line">                * getattr(p_example, &quot;lr_mul&quot;, 1.0)</span><span class="line">            )</span><span class="line">            eff_weight_decay_val = (</span><span class="line">                group[&quot;lr&quot;]</span><span class="line">                * group[&quot;weight_decay&quot;]</span><span class="line">                * getattr(p_example, &quot;wd_mul&quot;, 1.0)</span><span class="line">            )</span><span class="line"></span><span class="line">            # Determine effective LR and WD once per group, assuming constant for same-shaped params.</span><span class="line">            eff_lr_val = (</span><span class="line">                group[&quot;lr&quot;]</span><span class="line">                * max(1, params[0].size(-2) / params[0].size(-1)) ** 0.5</span><span class="line">                * getattr(params[0], &quot;lr_mul&quot;, 1.0)</span></pre></div>
+                    </div>
+                </div>
+            </div>
+
+    <div class="nav-buttons">
+        <a href="track_1_short_r36_34_09-18-25.html" class="nav-btn">← Previous Record</a>
+        <a href="../index.html" class="nav-btn">Back to Index</a>
+        <a href="track_1_short_r38_36_09-23-25.html" class="nav-btn">Next Record →</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.toggle-icon');
+    content.classList.toggle('open');
+    if (icon) icon.classList.toggle('open');
+}
+</script>
+</body>
+</html>
